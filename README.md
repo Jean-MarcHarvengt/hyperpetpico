@@ -12,8 +12,8 @@ At this point of time, the hyperpetpico project supports<br>
 * 16 (reusable) sprites
 * dual layers tiles mode or tiles + text with smooth scrolling
 * bitmap mode
-* [Memory remains as original (4 to 32K)]
-* [No storage is offered]
+* [RAM remains as original (4 to 32K)!]
+* [No storage is offered!]
 
 <br>
 
