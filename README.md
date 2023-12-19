@@ -30,6 +30,7 @@ The rest of the PET hardware is used (CPU, keyboatd, ...)
 
 To ease development, the second module can be used as a standalone PET emulator<br>
 * developed programs can be injected over WiFI for testing
-
-<br>
 * terminal can be used a keyboard input
+* all new features are available, only the CPU is emulated
+<br>
+
