@@ -13,19 +13,20 @@ At this point of time, the hyperpetpico project supports<br>
 * dual layers tiles mode or tiles + text with smooth scrolling
 * bitmap mode
 * [Memory remains as original (4 to 32K)]
+* [No storage is offered]
 
 <br>
 
 The hyperperpico exists as 2 modules<br>
-* a first module (residing inside the PET) multiplexing the memory expansion connector to the outside
-* a second module as a plugin board offering the new features (with VGA/audio connectors)
+* a first module (residing inside the PET) multiplexing the memory expansion connectors to the outside
+* a second module as a plugin board, offering the new features (with VGA/audio connectors)
 
 <br>
 
-The picture of the integrated monitor is mirrored to the VGA by default.<br>
-Programs can be loaded (via tape emulation, or modern as PETdisk or PETdisk MAX 2)<br>
+The picture on the PET monitor is mirrored to VGA by default.<br>
+Programs can be loaded (via tape emulation, or modern devices as PETdisk or PETdisk MAX 2)<br>
 As soon a program make uses of extended graphics capabilities, only VGA is usable<br>
-The rest of the PET hardware is used (CPU, keyboatd, ...)
+The rest of the PET hardware is just used (CPU, keyboard, PIA, VIA ...)
 <br>
 
 To ease development, the second module can be used as a standalone PET emulator<br>
