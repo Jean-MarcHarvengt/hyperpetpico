@@ -4,7 +4,7 @@ The model 4032/8032 remains impressive machine per today (great keyboard, 80 col
 Today the PET deserves a modern hardware expansion board!<br>
 <br>
 This project intent to upgrade the PET to a late 80s computer.<br>
-Initially the purpose was to offer a VGA output.<br><br>
+Initially the purpose was to offer VGA output.<br><br>
 At this point of time, the hyperpetpico project supports<br>
 * VGA output up to 640x200 (80 colums)
 * SID sound emulation
