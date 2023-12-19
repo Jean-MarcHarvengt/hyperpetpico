@@ -11,7 +11,8 @@ At this point of time the hyperpetpico project supports:
 * extended graphical modes supporting (640/320/256)x200 resolution in 256 colors.
 * 16 (reusable) sprites
 * dual layers tiles mode or tiles + text with smooth scrolling
-* bitmap mode<br>
+* bitmap mode
+<br>
 Memory remains as original (4 to 32K)
 <br>
 The hyperperpico exists as 2 modules:
