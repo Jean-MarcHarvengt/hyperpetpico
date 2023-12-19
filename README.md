@@ -1,7 +1,7 @@
 # hyperpetpico for PET 4032/8032
 The commodore PET is the grand father of all personal computers.<br>
 The model 4032/8032 remains impressive machine per today (great keyboard, 80 colums...)<br>
-Today the PET also deserves its modern hardware extention!<br>
+Today the PET deserves a modern hardware expansion board!<br>
 <br>
 This project intent to upgrade the PET to a late 80s computer.<br>
 Initially the purpose was to offer a VGA output.<br><br>
