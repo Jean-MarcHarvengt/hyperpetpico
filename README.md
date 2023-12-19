@@ -15,7 +15,7 @@ At this point of time, the hyperpetpico project supports
 * [Memory remains as original (4 to 32K)]
 <br>
 
-The hyperperpico exists as 2 modules
+The hyperperpico exists as 2 modules<br>
 * a first module (residing inside the PET) multiplexing the memory expansion connector to the outside
 * a second module as a plugin board offering the new features (with VGA/audio connectors)<br>
 
