@@ -26,11 +26,11 @@ The hyperperpico exists as 2 modules<br>
 The picture on the PET monitor is mirrored to VGA by default.<br>
 Programs can be loaded (via tape emulation, or modern devices as PETdisk or PETdisk MAX 2)<br>
 As soon a program make uses of extended graphics capabilities, only VGA is usable<br>
-The rest of the PET hardware is just used for its CPU, RAM, keyboard, PIA, VIA ...
+The rest of the PET hardware is just used for its CPU,RAM,ROM,keyboard,PIA,VIA ...
 <br>
 
 To ease development, the second module can be used as a standalone PET emulator<br>
-* the CPU, RAM,PIA,VIA are emulated
+* the CPU,RAM,ROM,PIA,VIA are emulated
 * a OTG USB keyboard can be used
 * new GFX/sound features are available for new development 
 * developed programs can be injected over WiFI for testing
