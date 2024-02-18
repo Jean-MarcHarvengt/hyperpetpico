@@ -46,8 +46,17 @@ To ease development, the second module can be used as a standalone PET emulator<
   * git submodule update --init
 * export PICO_SDK_PATH=/Users/jean-marcharvengt/Documents/pico/pico-sdk (e.g. path to pico-sdk!)
 * clone this project
+  * git@github.com:Jean-MarcHarvengt/hyperpetpico.git
   * cd hyperpetpico
-
+  * edit CMakeLists.txt and uncomment proper target
+    * #set(TARGET hyperpetpico)        => to use un real PET
+    * #set(TARGET hyperpetpicoemu)     => to use as standalone emu without wifi
+    * #set(TARGET hyperpetpicoemuwifi) => to use as standalone emu with wifi (picow only)
+  * mkdir build
+  * cd build
+  * picow: cmake -DPICO_BOARD=pico_w ..
+  * pico : cmake .. 
+  * make
 
 ## Special credits
 Hyperpetpico reuse or is inspired from the code of below projects
