@@ -39,7 +39,7 @@ To ease development, the second module can be used as a standalone PET emulator<
 <br>
 
 ## Special credits
-Hyperpetpico inspires from the code of the below projects
+Hyperpetpico reuse or is inspired from the code of the below projects
 * [PicoVGA](https://github.com/Panda381/PicoVGA)
 * [AppleII-VGA](https://github.com/markadev/AppleII-VGA)
 * Tftp server on Raspberry PICO from Damien P. George
