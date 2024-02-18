@@ -58,6 +58,11 @@ To ease development, the second module can be used as a standalone PET emulator<
   * pico : cmake .. 
   * make
 
+## connect over WiFi (picow standalone)
+* accesspoint :	hyperpetpico
+* passwd      :   picopet123
+* IP address  :	192.168.123.1
+
 ## Special credits
 Hyperpetpico reuse or is inspired from the code of below projects
 * [PicoVGA](https://github.com/Panda381/PicoVGA)
