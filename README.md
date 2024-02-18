@@ -48,8 +48,8 @@ To ease development, the second module can be used as a standalone PET emulator<
 * clone this project
   * git@github.com:Jean-MarcHarvengt/hyperpetpico.git
   * cd hyperpetpico
-  * edit CMakeLists.txt and uncomment proper target
-    * #set(TARGET hyperpetpico)        => to use un real PET
+  * edit CMakeLists.txt and uncomment desired target
+    * #set(TARGET hyperpetpico)        => to use in a real PET
     * #set(TARGET hyperpetpicoemu)     => to use as standalone emu without wifi
     * #set(TARGET hyperpetpicoemuwifi) => to use as standalone emu with wifi (picow only)
   * mkdir build
