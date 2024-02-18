@@ -39,9 +39,9 @@ To ease development, the second module can be used as a standalone PET emulator<
 
 ## Initial prototypes
 <p align="center">
-<img src="/images/proto1_1.jpg" width="200" />  
-<img src="/images/proto1_2.jpg" width="200" />  
-<img src="/images/proto2.png" width="200" />  
+<img src="/images/proto1_1.jpg" width="200" width="400"  />  
+<img src="/images/proto1_2.jpg" width="200" width="400" />  
+<img src="/images/proto2.png" width="200" width="400" />  
 </p>
 
 ## Build procedure
