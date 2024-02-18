@@ -11,8 +11,9 @@ At this point of time, the hyperpetpico project supports:<br>
 * SID sound emulation
 * extended graphical modes supporting (640/320/256)x200 resolution in 256 colors.
 * 16 sprites (reusable up to 128)
-* dual layers tiles mode or tiles + text with smooth scrolling
-* 320x200 bitmap mode (256 colors)
+* dual layers: 2 tiles layers or tiles+text with smooth scrolling
+* 320x200 bitmap mode (256 colors) is possible on the lower layer
+* background color/rasters
 * [RAM remains as original (4 to 32K)!]
 * [No storage is offered!]
 
