@@ -34,7 +34,16 @@ The rest of the PET hardware is just used for its CPU,RAM,ROM,keyboard,PIA,VIA .
 To ease development, the second module can be used as a standalone PET emulator<br>
 * the CPU,RAM,ROM,PIA,VIA are emulated
 * a OTG USB keyboard can be used
-* new GFX/sound features are available for new development 
+* new GFX/sound features are available for development 
 * developed programs can be injected over WiFI for testing
 <br>
+
+## Special credits
+Hyperpetpico inspires from the code of the below projects
+* [PicoVGA](https://github.com/Panda381/PicoVGA)
+* [AppleII-VGA](https://github.com/markadev/AppleII-VGA)
+* Tftp server on Raspberry PICO from Damien P. George
+* [Pucrunch compressor for 6502 CPU](https://github.com/mist64/pucrunch)
+* [reSID emulator](https://en.wikipedia.org/wiki/ReSID)
+* [MOS6502](https://github.com/gianlucag/mos6502)
 
