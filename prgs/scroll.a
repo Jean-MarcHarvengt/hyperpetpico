@@ -1,0 +1,264 @@
+
+
+!to "scroll.prg"
+
+
+*= $0401
+        * = $0401
+        !word bas_end
+        !word $00
+        !byte $9e
+        !text "2048"
+        !byte $00
+bas_end !word $00
+
+; Graphics
+; tile/text map
+REG_TEXTMAP_L1    = $8000
+REG_TILEMAP_L1    = $8800
+REG_TILEMAP_L0    = $9000
+
+; sprite
+REG_SPRITE_IND    = $9800
+REG_SPRITE_XHI    = $9880
+REG_SPRITE_XLO    = $9900
+REG_SPRITE_Y      = $9980
+
+; mode
+REG_VIDEO_MODE    = $9b00
+; 0-1: resolution (0=640x200,1=320x200,2=256x200)
+
+; bg/text color
+REG_BG_COL        = $9b01
+; RGB332
+REG_FG_COL        = $9b0d
+; RGB332
+
+; layers config
+REG_LAYERS_CFG    = $9b02
+; 0: L0 on/off
+; 1: L1 on/off    (off if HIRES and bitmap in L0!)
+; 2: L2 on/off
+; 3: L0/L1 swap
+; 4: bitmap/tile in L0
+; 5: petfont/tile in L1
+; 6: enable scroll area in L0
+; 7: enable scroll area in L1
+
+; lines config
+REG_LINES_CFG     = $9b03
+; 0: single/perline background color
+; 1: single/perline L0 xscroll
+; 2: single/perline L1 xscroll
+
+; layer scroll
+REG_XSCROLL_HI    = $9b04
+; 3-0: L0 xscroll hi
+; 7-4: L1 xscroll hi
+REG_XSCROLL_L0    = $9b05
+REG_XSCROLL_L1    = $9b06
+REG_YSCROLL_L0    = $9b07
+REG_YSCROLL_L1    = $9b08
+; scroll area
+REG_SC_START_L0   = $9b09
+REG_SC_END_L0     = $9b0a
+REG_SC_START_L1   = $9b0b
+REG_SC_END_L1     = $9b0c
+; 4-0
+
+; data transfer
+REG_TLOOKUP       = $9a00
+REG_TDEPTH        = $9b10
+; 1/2/4/8 items/bytes packet  (e.g. pixels)
+; 0 = undefined
+REG_TCOMMAND      = $9b11
+; 1: transfer tiles data      (data=tilenr,64/packet pixels)
+; 2: transfer sprites data    (data=spritenr,384/packet pixels)
+; 3: transfer bitmap data     (data=xh,xl,y,wh,wl,h,w*h/packet pixels) 
+; 4: transfer t/fmap col data (data=layer,col,row,size,size/packet tiles)
+; 5: transfer t/fmap row data (data=layer,col,row,size,size/packet tiles)
+REG_TPARAMS       = $9b12
+REG_TDATA         = $9b13
+
+; lines background color / scroll (200 values)
+REG_LINES_BG_COL  = $9b38
+; RGB332
+REG_LINES_XSCR_HI = $9c00
+; 7-4:  lines L1 xscroll hi, 3-0: L0 xscroll hi
+REG_LINES_L0_XSCR = $9cc8
+REG_LINES_L1_XSCR = $9d90
+
+; Audio
+; SID (see C64)
+REG_SID_BASE      = $9f00
+
+
+ROW_START = 0
+ROW_END   = 12
+
+*= $0800
+
+
+        lda #1
+        sta REG_VIDEO_MODE
+        lda #ROW_START
+        sta REG_SC_START_L1
+        lda #ROW_END
+        sta REG_SC_END_L1
+        lda #$82
+        sta REG_LAYERS_CFG
+        lda #$00
+        sta REG_LINES_CFG
+        lda #$00
+        sta REG_XSCROLL_HI      
+        
+
+        ldx #40-1                ; fill screen with something
+        ldy #$00
+lfill
+        lda #$20
+        sta REG_TEXTMAP_L1,y
+        iny
+        dex
+        bpl lfill
+        
+
+        lda #ROW_END 
+        sbc #ROW_START
+        adc #8
+        asl
+        asl
+        asl
+        tax        
+        ldy #$00
+-
+        lda #$00
+        sta REG_LINES_XSCR_HI,y
+        sta REG_LINES_L1_XSCR,y
+        iny
+        dex
+        bne -
+
+        lda $90                 ; install VBL irq
+        sta $033d
+        lda $90+1
+        sta $033d+1
+        lda #0
+        sta $033c
+        sei
+        lda #<newirq
+        sta $90
+        lda #>newirq
+        sta $90+1
+        cli
+
+        rts
+
+
+
+;-------------------------------------------------------------
+newirq
+; scrollx
+        lda sposlo
+        adc #$1
+        sta sposlo
+        bcc +             
+        inc sposhi        
++
+; wrap arround 320 ($140)
+        cmp #$40 
+        bne ++
+        lda sposhi
+        cmp #$1 
+        bne ++
+        lda #0
+        sta sposlo
+        sta sposhi
+++
+
+; update new tile after 8 pixels
+        lda sposlo
+        sta REG_XSCROLL_L1
+        and #$7
+        bne skiptile
+; tile position
+        lda tilepos
+        cmp #40
+        bne +++
+        lda #0
+        sta tilepos
++++        
+        inc tilepos
+        tay
+; update with next tile in map
+        inc mappos
+        lda mappos
+        and #$0f
+        tax
+
+
+        lda #9                  ; transfer mode: 8bits, no lut
+        sta $9b10
+        lda #$04                ; command = transfer row
+        sta $9b11
+        lda #2                  ; L1 TEXT
+        sta $9b12
+        tya                     ; col
+        sta $9b12        
+        lda #0                  ; row        
+        sta $9b12              
+        lda #12                 ; height
+        sta $9b12 
+        
+        lda map,x
+        sta $9b13
+        sta $9b13
+        sta $9b13
+        sta $9b13
+        sta $9b13
+        sta $9b13
+        sta $9b13
+        sta $9b13
+        sta $9b13
+        sta $9b13
+        sta $9b13
+        sta $9b13
+
+;        sta REG_TEXTMAP_L1,y
+;        sta REG_TEXTMAP_L1+40*1,y
+;        sta REG_TEXTMAP_L1+40*2,y
+;        sta REG_TEXTMAP_L1+40*3,y
+;        sta REG_TEXTMAP_L1+40*4,y
+;        sta REG_TEXTMAP_L1+40*5,y
+;        sta REG_TEXTMAP_L1+40*6,y
+;        sta REG_TEXTMAP_L1+40*7,y
+
+skiptile
+; update scroll hi part
+        lda sposhi
+        asl
+        asl
+        asl
+        asl
+        sta REG_XSCROLL_HI
+
+        jmp ($033d)
+
+
+sposlo
+!byte $00
+sposhi
+!byte $00
+
+tilepos
+!byte 00
+mappos
+!byte 00
+
+map
+!byte $00,$01,$02,$03,$04,$05,$06,$07,$08,$09,$0a,$0b,$0c,$0d,$0e,$0f
+
+
+
+
+

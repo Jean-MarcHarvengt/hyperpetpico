@@ -1,0 +1,186 @@
+!to "filu.prg"
+
+
+*= $0401
+        * = $0401
+        !word bas_end
+        !word $00
+        !byte $9e
+        !text "2048"
+        !byte $00
+bas_end !word $00
+
+; Graphics
+; tile/text map
+REG_TEXTMAP_L1    = $8000
+REG_TILEMAP_L1    = $8800
+REG_TILEMAP_L0    = $9000
+
+; sprite
+REG_SPRITE_IND    = $9800
+REG_SPRITE_XHI    = $9880
+REG_SPRITE_XLO    = $9900
+REG_SPRITE_Y      = $9980
+
+; mode
+REG_VIDEO_MODE    = $9b00
+; 0-1: resolution (0=64$200,1=32$200,2=256x200)
+
+; bg/text color
+REG_BG_COL        = $9b01
+; RGB332
+REG_FG_COL        = $9b0d
+; RGB332
+
+; layers config
+REG_LAYERS_CFG    = $9b02
+; 0: L0 on/off
+; 1: L1 on/off    (off if HIRES and bitmap in L0!)
+; 2: L2 on/off
+; 3: L2 inbetween
+; 4: bitmap/tile in L0
+; 5: petfont/tile in L1
+; 6: enable scroll area in L0
+; 7: enable scroll area in L1
+REG_TILES_CFG     = $9b0e
+; 0: 0=8x8tile, 1=16x16tiles
+
+; lines config
+REG_LINES_CFG     = $9b03
+; 0: single/perline background color
+; 1: single/perline L0 xscroll
+; 2: single/perline L1 xscroll
+
+; layer scroll
+REG_XSCROLL_HI    = $9b04
+; 3-0: L0 xscroll hi
+; 7-4: L1 xscroll hi
+REG_XSCROLL_L0    = $9b05
+REG_XSCROLL_L1    = $9b06
+REG_YSCROLL_L0    = $9b07
+REG_YSCROLL_L1    = $9b08
+; scroll area
+REG_SC_START_L0   = $9b09
+REG_SC_END_L0     = $9b0a
+REG_SC_START_L1   = $9b0b
+REG_SC_END_L1     = $9b0c
+; 4-0
+
+; tiles config
+REG_TILES_CFG     = $9b0e
+; 0: L0: 0=8x8, 1=16x16
+; 1: L1: 0=8x8, 1=16x16
+; 2-4: xcurtain left
+;  0: on/off
+;  1: 8/16 pixels
+; 5-7: ycurtain top
+;  0: on/off
+;  1: 8/16 pixels
+
+; data transfer
+REG_TLOOKUP       = $9a00
+REG_TDEPTH        = $9b10
+; 1/2/4/8 bits per pixel (using indexed CLUT)
+; 9 = 8 bits RGB332 no CLUT
+; 0 = compressed
+REG_TCOMMAND      = $9b11
+; 1: transfer tiles data      (data=tilenr,64/packet pixels)
+; 2: transfer sprites data    (data=spritenr,384/packet pixels)
+; 3: transfer bitmap data     (data=xh,xl,y,wh,wl,h,w*h/packet pixels) 
+; 4: transfer t/fmap col data (data=layer,col,row,size,size/packet tiles)
+; 5: transfer t/fmap row data (data=layer,col,row,size,size/packet tiles)
+REG_TPARAMS       = $9b12
+REG_TDATA         = $9b13
+
+; lines background color / scroll (200 values)
+REG_LINES_BG_COL  = $9b38
+; RGB332
+REG_LINES_XSCR_HI = $9c00
+; 7-4:  lines L1 xscroll hi, 3-0: L0 xscroll hi
+REG_LINES_L0_XSCR = $9cc8
+REG_LINES_L1_XSCR = $9d90
+
+; Audio
+; SID (see C64)
+REG_SID_BASE      = $9f00
+
+ROW_NB    = 25
+ROW_START = 0
+ROW_END   = (ROW_NB-1)
+
+*= $0800
+;        lda #2                  ; 256x200 (32x25)
+;        sta REG_VIDEO_MODE
+
+        ldx #$00                ; clear screen L1 (text)
+        lda #00
+clr_l1:
+        sta REG_TEXTMAP_L1,x
+        sta REG_TEXTMAP_L1+$100,x
+        sta REG_TEXTMAP_L1+$200,x
+        sta REG_TEXTMAP_L1+$300,x
+        sta REG_TEXTMAP_L1+$400,x
+        sta REG_TEXTMAP_L1+$500,x
+        sta REG_TEXTMAP_L1+$600,x
+        sta REG_TEXTMAP_L1+$700,x
+        dex
+        bne clr_l1
+
+        ldx #$00                ; clear screen L0 (tile)
+        ldy #$00
+        lda #0
+clr_l0:
+        sta REG_TILEMAP_L0,y
+        sta REG_TILEMAP_L0+$100,y
+        sta REG_TILEMAP_L0+$200,y
+        sta REG_TILEMAP_L0+$300,y
+        sta REG_TILEMAP_L0+$400,y
+        sta REG_TILEMAP_L0+$500,y
+        sta REG_TILEMAP_L0+$600,y
+        sta REG_TILEMAP_L0+$700,y
+        iny
+        dex
+        bne clr_l0
+
+        ldx #$00                ; clear screen L1 (tile)
+        ldy #$00
+        lda #0
+clr_l1t:
+        sta REG_TILEMAP_L1,y
+        sta REG_TILEMAP_L1+$100,y
+        sta REG_TILEMAP_L1+$200,y
+        sta REG_TILEMAP_L1+$300,y
+        sta REG_TILEMAP_L1+$400,y
+        sta REG_TILEMAP_L1+$500,y
+        sta REG_TILEMAP_L1+$600,y
+        sta REG_TILEMAP_L1+$700,y
+        iny
+        dex
+        bne clr_l1t        
+
+
+        lda #$00
+clr_l2t:
+        ldx #$40
+clr_l3t:
+        ldy #$00
+clr_l4t:
+        sta REG_TEXTMAP_L1,y
+        sta REG_TEXTMAP_L1+$100,y
+        sta REG_TEXTMAP_L1+$200,y
+        sta REG_TEXTMAP_L1+$300,y
+        sta REG_TEXTMAP_L1+$400,y
+        sta REG_TEXTMAP_L1+$500,y
+        sta REG_TEXTMAP_L1+$600,y
+        sta REG_TEXTMAP_L1+$700,y
+        dey
+        bne clr_l4t        
+        dex
+        bne clr_l3t
+        adc #1
+        and #$1f
+        jmp clr_l2t
+
+        rts
+
+

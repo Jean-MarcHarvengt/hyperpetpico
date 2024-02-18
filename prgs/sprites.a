@@ -1,0 +1,352 @@
+!to "sprites.prg"
+
+
+*= $0401
+        * = $0401
+        !word bas_end
+        !word $00
+        !byte $9e
+        !text "2048"
+        !byte $00
+bas_end !word $00
+
+; Graphics
+; tile/text map
+REG_TEXTMAP_L1    = $8000
+REG_TILEMAP_L1    = $8800
+REG_TILEMAP_L0    = $9000
+
+; sprite
+REG_SPRITE_IND    = $9800
+REG_SPRITE_XHI    = $9880
+REG_SPRITE_XLO    = $9900
+REG_SPRITE_Y      = $9980
+
+; mode
+REG_VIDEO_MODE    = $9b00
+; 0-1: resolution (0=64$200,1=32$200,2=256x200)
+
+; bg/text color
+REG_BG_COL        = $9b01
+; RGB332
+REG_FG_COL        = $9b0d
+; RGB332
+
+; layers config
+REG_LAYERS_CFG    = $9b02
+; 0: L0 on/off
+; 1: L1 on/off    (off if HIRES and bitmap in L0!)
+; 2: L2 on/off
+; 3: L2 inbetween
+; 4: bitmap/tile in L0
+; 5: petfont/tile in L1
+; 6: enable scroll area in L0
+; 7: enable scroll area in L1
+REG_TILES_CFG     = $9b0e
+; 0: 0=8x8tile, 1=16x16tiles
+
+; lines config
+REG_LINES_CFG     = $9b03
+; 0: single/perline background color
+; 1: single/perline L0 xscroll
+; 2: single/perline L1 xscroll
+
+; layer scroll
+REG_XSCROLL_HI    = $9b04
+; 3-0: L0 xscroll hi
+; 7-4: L1 xscroll hi
+REG_XSCROLL_L0    = $9b05
+REG_XSCROLL_L1    = $9b06
+REG_YSCROLL_L0    = $9b07
+REG_YSCROLL_L1    = $9b08
+; scroll area
+REG_SC_START_L0   = $9b09
+REG_SC_END_L0     = $9b0a
+REG_SC_START_L1   = $9b0b
+REG_SC_END_L1     = $9b0c
+; 4-0
+
+; tiles config
+REG_TILES_CFG     = $9b0e
+; 0: L0: 0=8x8, 1=16x16
+; 1: L1: 0=8x8, 1=16x16
+; 2-4: xcurtain left
+;  0: on/off
+;  1: 8/16 pixels
+; 5-7: ycurtain top
+;  0: on/off
+;  1: 8/16 pixels
+
+; data transfer
+REG_TLOOKUP       = $9a00
+REG_TDEPTH        = $9b10
+; 1/2/4/8 bits per pixel (using indexed CLUT)
+; 9 = 8 bits RGB332 no CLUT
+; 0 = compressed
+REG_TCOMMAND      = $9b11
+; 1: transfer tiles data      (data=tilenr,64/packet pixels)
+; 2: transfer sprites data    (data=spritenr,384/packet pixels)
+; 3: transfer bitmap data     (data=xh,xl,y,wh,wl,h,w*h/packet pixels) 
+; 4: transfer t/fmap col data (data=layer,col,row,size,size/packet tiles)
+; 5: transfer t/fmap row data (data=layer,col,row,size,size/packet tiles)
+REG_TPARAMS       = $9b12
+REG_TDATA         = $9b13
+
+; lines background color / scroll (200 values)
+REG_LINES_BG_COL  = $9b38
+; RGB332
+REG_LINES_XSCR_HI = $9c00
+; 7-4:  lines L1 xscroll hi, 3-0: L0 xscroll hi
+REG_LINES_L0_XSCR = $9cc8
+REG_LINES_L1_XSCR = $9d90
+
+; Audio
+; SID (see C64)
+REG_SID_BASE      = $9f00
+
+
+ROW_NB                  = 25
+ROW_START               = 0
+ROW_END                 = (ROW_NB-1)
+
+NB_SPRITES_TOTAL        = 96
+
+*= $0800
+;        lda #2                  ; 256x200 (32x25)
+;        sta REG_VIDEO_MODE
+
+
+
+        lda #9                   ; transfer mario: 8 bits no clut
+        sta REG_TDEPTH
+        ldx #$00                 ; id 0
+        lda #<sprite_mario
+        sta $54
+        lda #>sprite_mario
+        sta $55
+        jsr sprite8bits
+
+        ldy #0                    ; Hide all sprites available
+spr1:
+        lda #$0
+        sta REG_SPRITE_IND,y
+        sta REG_SPRITE_XHI,y
+        sta REG_SPRITE_XLO,y
+        lda #200
+        sta REG_SPRITE_Y,y
+        iny
+        cpy #NB_SPRITES_TOTAL
+        bne spr1
+
+        lda #24*1
+        ldy #0
+        jsr set_16sprites_y
+        ldy #0
+        jsr spread_16sprites_x
+
+        lda #24*2
+        ldy #16
+        jsr set_16sprites_y
+        ldy #16
+        jsr spread_16sprites_x
+
+        lda #24*3
+        ldy #32
+        jsr set_16sprites_y
+        ldy #32
+        jsr spread_16sprites_x
+
+        lda #24*4
+        ldy #48
+        jsr set_16sprites_y
+        ldy #48
+        jsr spread_16sprites_x
+
+        lda #24*5
+        ldy #64
+        jsr set_16sprites_y
+        ldy #64
+        jsr spread_16sprites_x
+
+        lda #24*6
+        ldy #80
+        jsr set_16sprites_y
+        ldy #80
+        jsr spread_16sprites_x
+
+ ;       lda #24*7
+ ;       ldy #96
+ ;       jsr set_16sprites_y
+ ;       ldy #96
+ ;       jsr spread_16sprites_x
+        
+WAIT_KEY
+        jsr $FFE4               ; Calling KERNAL GETIN 
+        beq WAIT_KEY
+        jsr spriteshide
+        rts
+
+;-------------------------------------------------------------
+spriteshide:
+        ldy #NB_SPRITES_TOTAL-1 ; Hide sprites available
+clrsp:
+        lda #$00
+        sta REG_SPRITE_IND,y
+        sta REG_SPRITE_XHI,y
+        sta REG_SPRITE_XLO,y
+        lda #200
+        sta REG_SPRITE_Y,y
+        dey
+        bpl clrsp
+        rts
+
+;-------------------------------------------------------------
+spread_16sprites_x:
+        lda #0+0*16
+        sta REG_SPRITE_XLO,y
+        iny
+        lda #0+1*16
+        sta REG_SPRITE_XLO,y
+        iny
+        lda #0+2*16
+        sta REG_SPRITE_XLO,y
+        iny
+        lda #0+3*16
+        sta REG_SPRITE_XLO,y
+        iny
+        lda #0+4*16
+        sta REG_SPRITE_XLO,y
+        iny
+        lda #0+5*16
+        sta REG_SPRITE_XLO,y
+        iny
+        lda #0+6*16
+        sta REG_SPRITE_XLO,y
+        iny
+        lda #0+7*16
+        sta REG_SPRITE_XLO,y
+        iny
+        lda #0+8*16
+        sta REG_SPRITE_XLO,y
+        iny
+        lda #0+9*16
+        sta REG_SPRITE_XLO,y
+        iny
+        lda #0+10*16
+        sta REG_SPRITE_XLO,y
+        iny
+        lda #0+11*16
+        sta REG_SPRITE_XLO,y
+        iny
+        lda #0+12*16
+        sta REG_SPRITE_XLO,y
+        iny
+        lda #0+13*16
+        sta REG_SPRITE_XLO,y
+        iny
+        lda #0+14*16
+        sta REG_SPRITE_XLO,y
+        iny
+        lda #0+15*16
+        sta REG_SPRITE_XLO,y
+        iny
+        rts
+
+set_16sprites_y:
+        sta REG_SPRITE_Y,y
+        iny
+        sta REG_SPRITE_Y,y
+        iny
+        sta REG_SPRITE_Y,y
+        iny
+        sta REG_SPRITE_Y,y
+        iny
+        sta REG_SPRITE_Y,y
+        iny
+        sta REG_SPRITE_Y,y
+        iny
+        sta REG_SPRITE_Y,y
+        iny
+        sta REG_SPRITE_Y,y
+        iny
+        sta REG_SPRITE_Y,y
+        iny
+        sta REG_SPRITE_Y,y
+        iny
+        sta REG_SPRITE_Y,y
+        iny
+        sta REG_SPRITE_Y,y
+        iny
+        sta REG_SPRITE_Y,y
+        iny
+        sta REG_SPRITE_Y,y
+        iny
+        sta REG_SPRITE_Y,y
+        iny
+        sta REG_SPRITE_Y,y
+        iny
+        rts
+
+;-------------------------------------------------------------
+sprite8bits     
+        lda #2                  ; command = transfer sprite
+        sta REG_TCOMMAND 
+        txa                     ; param = sprite id
+        sta REG_TPARAMS
+        lda #16
+        sta REG_TPARAMS 
+        lda #24
+        sta REG_TPARAMS
+        lda $54
+        pha
+        lda $55
+        pha
+        ldy #$00
+sprite80:
+        lda ($54),y
+        sta REG_TDATA
+        iny
+        bne sprite80
+        inc $55
+sprite81:
+        lda ($54),y
+        sta REG_TDATA
+        iny
+        cpy #128
+        bne sprite81
+        pla 
+        sta $55
+        pla
+        sta $54
+        rts
+
+
+
+
+;-------------------------------------------------------------
+sprite_mario:
+!byte $00,$00,$00,$00,$00,$00,$24,$24,$24,$24,$24,$00,$00,$00,$00,$00
+!byte $00,$00,$00,$00,$24,$24,$e5,$e1,$e9,$f9,$e9,$24,$00,$00,$00,$00
+!byte $00,$00,$00,$24,$e1,$e1,$a1,$a1,$d0,$f9,$ff,$24,$00,$00,$00,$00
+!byte $00,$00,$24,$a1,$e5,$a1,$81,$24,$24,$24,$24,$24,$24,$00,$00,$00
+!byte $00,$24,$a5,$a1,$81,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$00
+!byte $00,$24,$f6,$24,$24,$44,$e9,$24,$e9,$24,$ed,$00,$00,$00,$00,$00
+!byte $24,$f6,$8d,$f6,$24,$e9,$f6,$24,$f6,$24,$f6,$8d,$6c,$00,$00,$00
+!byte $24,$e9,$88,$f6,$24,$24,$fa,$f6,$fa,$f6,$fa,$f6,$f6,$68,$00,$00
+!byte $24,$40,$e9,$f6,$24,$f6,$f6,$44,$e9,$ed,$e9,$ed,$e9,$68,$00,$00
+!byte $00,$24,$40,$e9,$ed,$f6,$44,$20,$20,$20,$20,$20,$24,$00,$00,$00
+!byte $00,$00,$24,$84,$e9,$e9,$e9,$e9,$20,$24,$24,$24,$00,$00,$00,$00
+!byte $00,$00,$68,$81,$84,$84,$88,$88,$68,$29,$24,$00,$00,$00,$00,$00
+!byte $00,$00,$68,$a5,$a5,$e9,$68,$4e,$7a,$7a,$29,$24,$24,$00,$00,$00
+!byte $00,$24,$68,$ff,$ff,$ff,$8d,$ff,$ff,$9b,$ff,$49,$24,$24,$00,$00
+!byte $24,$64,$88,$ff,$ff,$8d,$4e,$ff,$ff,$9b,$ff,$24,$88,$88,$24,$00
+!byte $88,$88,$68,$ff,$ff,$68,$2e,$4e,$52,$7a,$29,$20,$88,$88,$24,$ff
+!byte $88,$88,$49,$68,$6c,$2e,$2e,$2e,$2e,$09,$ff,$88,$88,$88,$00,$00
+!byte $24,$88,$88,$24,$24,$09,$05,$05,$09,$24,$24,$88,$88,$24,$00,$00
+!byte $00,$24,$24,$00,$00,$00,$00,$00,$00,$00,$00,$24,$24,$00,$00,$00
+!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+

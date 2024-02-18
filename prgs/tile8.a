@@ -1,0 +1,507 @@
+
+
+!to "tile8.prg"
+
+
+*= $0401
+        * = $0401
+        !word bas_end
+        !word $00
+        !byte $9e
+        !text "2048"
+        !byte $00
+bas_end !word $00
+
+; Graphics
+; tile/text map
+REG_TEXTMAP_L1    = $8000
+REG_TILEMAP_L1    = $8800
+REG_TILEMAP_L0    = $9000
+
+; sprite
+REG_SPRITE_IND    = $9800
+REG_SPRITE_XHI    = $9880
+REG_SPRITE_XLO    = $9900
+REG_SPRITE_Y      = $9980
+
+; mode
+REG_VIDEO_MODE    = $9b00
+; 0-1: resolution (0=640x200,1=320x200,2=256x200)
+
+; bg/text color
+REG_BG_COL        = $9b01
+; RGB332
+REG_FG_COL        = $9b0d
+; RGB332
+
+; layers config
+REG_LAYERS_CFG    = $9b02
+; 0: L0 on/off
+; 1: L1 on/off    (off if HIRES and bitmap in L0!)
+; 2: L2 on/off
+; 3: L0/L1 swap
+; 4: bitmap/tile in L0
+; 5: petfont/tile in L1
+; 6: enable scroll area in L0
+; 7: enable scroll area in L1
+
+; lines config
+REG_LINES_CFG     = $9b03
+; 0: single/perline background color
+; 1: single/perline L0 xscroll
+; 2: single/perline L1 xscroll
+REG_TILES_CFG     = $9b0e
+; 0: 0=8x8tile, 1=16x16tiles
+
+; layer scroll
+REG_XSCROLL_HI    = $9b04
+; 3-0: L0 xscroll hi
+; 7-4: L1 xscroll hi
+REG_XSCROLL_L0    = $9b05
+REG_XSCROLL_L1    = $9b06
+REG_YSCROLL_L0    = $9b07
+REG_YSCROLL_L1    = $9b08
+; scroll area
+REG_SC_START_L0   = $9b09
+REG_SC_END_L0     = $9b0a
+REG_SC_START_L1   = $9b0b
+REG_SC_END_L1     = $9b0c
+; 4-0
+
+; data transfer
+REG_TLOOKUP       = $9a00
+REG_TDEPTH        = $9b10
+; 1/2/4/8 items/bytes packet  (e.g. pixels)
+; 0 = undefined
+REG_TCOMMAND      = $9b11
+; 1: transfer tiles data      (data=tilenr,w,h,packet pixels)
+; 2: transfer sprites data    (data=spritenr,w,h,packet pixels)
+; 3: transfer bitmap data     (data=xh,xl,y,wh,wl,h,w*h/packet pixels) 
+; 4: transfer t/fmap col data (data=layer,col,row,size,size/packet tiles)
+; 5: transfer t/fmap row data (data=layer,col,row,size,size/packet tiles)
+REG_TPARAMS       = $9b12
+REG_TDATA         = $9b13
+
+; lines background color / scroll (200 values)
+REG_LINES_BG_COL  = $9b38
+; RGB332
+REG_LINES_XSCR_HI = $9c00
+; 7-4:  lines L1 xscroll hi, 3-0: L0 xscroll hi
+REG_LINES_L0_XSCR = $9cc8
+REG_LINES_L1_XSCR = $9d90
+
+; Audio
+; SID (see C64)
+REG_SID_BASE      = $9f00
+
+*= $0800
+
+        ldx #15                 ; load 16 colors pallette
+lpal
+        lda palette,x
+        sta REG_TLOOKUP,x
+        dex
+        bpl lpal
+
+        ldx #$00                ; fill screen with something
+        ldy #$00
+lfill
+        ;lda #$20
+        ;sta $8000,y
+        tya
+        sta REG_TILEMAP_L0,y
+        sta REG_TILEMAP_L0+$100,y
+        sta REG_TILEMAP_L0+$200,y
+        sta REG_TILEMAP_L0+$300,y
+        iny
+        dex
+        bne lfill
+
+
+; transfer tiles
+        lda #$04                ; transfer mode: 4 bits => 16 first colours of palette
+        sta REG_TDEPTH
+      
+        lda #<tile40
+        sta $54
+        lda #>tile40
+        sta $55
+        ldy #$00
+        jsr filltile4bits
+
+        lda #<tile41
+        sta $54
+        lda #>tile41
+        sta $55
+        ldy #$01
+        jsr filltile4bits
+
+        lda #<tile42
+        sta $54
+        lda #>tile42
+        sta $55
+        ldy #$02
+        jsr filltile4bits
+
+        lda #<tile43
+        sta $54
+        lda #>tile43
+        sta $55
+        ldy #$03
+        jsr filltile4bits
+
+        lda #<tile44
+        sta $54
+        lda #>tile44
+        sta $55
+        ldy #$04
+        jsr filltile4bits
+
+; transfer sprites
+        lda #$ff                ; white is transparent
+        sta REG_TLOOKUP
+
+        lda #$04                ; transfer mode: 4 bits => 16 first colours of palette
+        sta REG_TDEPTH
+
+        lda #<sprite40
+        sta $54
+        lda #>sprite40
+        sta $55
+        ldy #$00
+        jsr fillsprite4bits
+
+        lda #<sprite41
+        sta $54
+        lda #>sprite41
+        sta $55
+        ldy #$01
+        jsr fillsprite4bits
+        
+
+
+        lda $90                 ; install VBL irq
+        sta $033d
+        lda $90+1
+        sta $033d+1
+        lda #0
+        sta $033c
+        sei
+        lda #<newirq
+        sta $90
+        lda #>newirq
+        sta $90+1
+        cli
+
+        rts
+
+
+;-------------------------------------------------------------
+newirq
+        lda spritex
+        adc #$01
+        sta spritex
+        sta REG_SPRITE_XLO
+        sta $8000
+        jmp ($033d)
+
+
+
+
+;-------------------------------------------------------------
+
+        lda #$01          ; transfer mode: 1 bit => 2 first colours of palette
+        sta REG_TDEPTH
+
+        lda #<tile10
+        sta $54
+        lda #>tile10
+        sta $55
+        ldy #$00 ; tile nr 
+        jsr filltile1bits
+
+        lda #<tile11
+        sta $54
+        lda #>tile11
+        sta $55
+        ldy #$01 ; tile nr 
+        jsr filltile1bits
+
+        lda #<tile12
+        sta $54
+        lda #>tile12
+        sta $55
+        ldy #$02 ; tile nr 
+        jsr filltile1bits
+
+        lda #<tile13
+        sta $54
+        lda #>tile13
+        sta $55
+        ldy #$03 ; tile nr 
+        jsr filltile1bits
+
+        lda #<tile14
+        sta $54
+        lda #>tile14
+        sta $55
+        ldy #$04 ; tile nr 
+        jsr filltile1bits
+        rts
+
+
+
+
+
+
+
+;-------------------------------------------------------------
+fillsprite4bits     
+        lda #2                  ; command = transfer sprites
+        sta REG_TCOMMAND
+        tya                     ; param = sprite id
+        sta REG_TPARAMS
+        lda #16
+        sta REG_TPARAMS 
+        sta REG_TPARAMS       
+        ldx #128
+        ldy #$00
+sfill0
+        lda ($54),y
+        sta REG_TDATA
+        iny
+        dex
+        bne sfill0
+        rts
+
+;-------------------------------------------------------------
+filltile4bits     
+        lda #1                  ; command = transfer tiles
+        sta REG_TCOMMAND 
+        tya                     ; param = tile id
+        sta REG_TPARAMS
+        lda #8
+        sta REG_TPARAMS 
+        sta REG_TPARAMS
+        ldx #32
+        ldy #$00
+tfill0
+        lda ($54),y
+        sta REG_TDATA
+        iny
+        dex
+        bne tfill0
+        rts
+
+;-------------------------------------------------------------
+filltile1bits    
+        lda #$01                ; command = transfer tiles
+        sta REG_TCOMMAND 
+        tya                     ; param = tile id
+        sta REG_TPARAMS
+        lda #8
+        sta REG_TPARAMS 
+        sta REG_TPARAMS        
+        ldx #16
+        ldy #$00
+tfill1
+        lda ($54),y
+        sta REG_TDATA
+        iny
+        dex
+        bne tfill1
+        rts
+
+
+spritex
+!byte $00
+
+palette
+;     black, red,  green, blue, cyan(G+B), magenta(R+B), yellow(G+R), white
+!byte $00,   $e0,  $1c,   $03,  $1f,       $e3,          $fc,         $ee
+!byte $00,   $e0,  $1c,   $03,  $1f,       $e3,          $fc,         $ee
+
+
+
+tile10
+!byte $00,$00,$00,$00
+!byte $00,$00,$00,$00
+tile11
+!byte $01,$01,$01,$01
+!byte $01,$01,$01,$01
+tile12
+!byte $03,$03,$03,$03
+!byte $03,$03,$03,$03
+tile13
+!byte $07,$07,$07,$07
+!byte $07,$07,$07,$07
+tile14
+!byte $01,$02,$04,$08
+!byte $10,$20,$40,$80
+
+
+
+tile40
+!byte $00,$00,$00,$00
+!byte $00,$00,$00,$00
+!byte $00,$00,$00,$00
+!byte $00,$00,$00,$00
+!byte $00,$00,$00,$00
+!byte $00,$00,$00,$00
+!byte $00,$00,$00,$00
+!byte $00,$00,$00,$00
+tile41
+!byte $11,$11,$11,$11
+!byte $11,$11,$11,$11
+!byte $11,$11,$11,$11
+!byte $11,$11,$11,$11
+!byte $11,$11,$11,$11
+!byte $11,$11,$11,$11
+!byte $11,$11,$11,$11
+!byte $11,$11,$11,$11
+tile42
+!byte $22,$22,$22,$22
+!byte $22,$22,$22,$22
+!byte $22,$22,$22,$22
+!byte $22,$22,$22,$22
+!byte $22,$22,$22,$22
+!byte $22,$22,$22,$22
+!byte $22,$22,$22,$22
+!byte $22,$22,$22,$22
+tile43
+!byte $33,$33,$33,$33
+!byte $33,$33,$33,$33
+!byte $33,$33,$33,$33
+!byte $33,$33,$33,$33
+!byte $33,$33,$33,$33
+!byte $33,$33,$33,$33
+!byte $33,$33,$33,$33
+!byte $33,$33,$33,$33
+tile44
+!byte $00,$00,$00,$06
+!byte $00,$00,$00,$60
+!byte $00,$00,$06,$00
+!byte $00,$00,$60,$00
+!byte $00,$06,$00,$00
+!byte $00,$60,$00,$00
+!byte $06,$00,$00,$00
+!byte $60,$00,$00,$00
+
+
+sprite40
+!byte $00,$00,$00,$00,$00,$00,$00,$00
+!byte $00,$01,$11,$11,$11,$11,$10,$00
+!byte $00,$01,$11,$11,$11,$11,$10,$00
+!byte $00,$22,$22,$22,$22,$22,$00,$00
+!byte $00,$22,$22,$22,$22,$22,$00,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$55,$55,$55,$55,$55,$00,$00
+!byte $00,$55,$55,$55,$55,$55,$00,$00
+!byte $00,$55,$55,$55,$55,$55,$00,$00
+!byte $00,$55,$55,$55,$55,$55,$00,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$22,$22,$22,$22,$22,$00,$00
+!byte $00,$22,$22,$22,$22,$22,$00,$00
+!byte $00,$01,$11,$11,$11,$11,$10,$00
+!byte $00,$01,$11,$11,$11,$11,$10,$00
+!byte $00,$00,$00,$00,$00,$00,$00,$00
+
+sprite41
+!byte $00,$00,$00,$00,$00,$00,$00,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$77,$77,$77,$77,$77,$77,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$77,$77,$77,$77,$77,$77,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$77,$77,$77,$77,$77,$77,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$77,$77,$77,$77,$77,$77,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$77,$77,$77,$77,$77,$77,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$77,$77,$77,$77,$77,$77,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$77,$77,$77,$77,$77,$77,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$77,$77,$77,$77,$77,$77,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$77,$77,$77,$77,$77,$77,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$77,$77,$77,$77,$77,$77,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+!byte $00,$77,$77,$77,$77,$77,$77,$00
+!byte $00,$00,$44,$44,$44,$44,$00,$00
+
+sine
+!byte $80, $83, $86, $89, $8C, $90, $93, $96
+!byte $99, $9C, $9F, $A2, $A5, $A8, $AB, $AE
+!byte $B1, $B3, $B6, $B9, $BC, $BF, $C1, $C4
+!byte $C7, $C9, $CC, $CE, $D1, $D3, $D5, $D8
+!byte $DA, $DC, $DE, $E0, $E2, $E4, $E6, $E8
+!byte $EA, $EB, $ED, $EF, $F0, $F1, $F3, $F4
+!byte $F5, $F6, $F8, $F9, $FA, $FA, $FB, $FC
+!byte $FD, $FD, $FE, $FE, $FE, $FF, $FF, $FF
+!byte $FF, $FF, $FF, $FF, $FE, $FE, $FE, $FD
+!byte $FD, $FC, $FB, $FA, $FA, $F9, $F8, $F6
+!byte $F5, $F4, $F3, $F1, $F0, $EF, $ED, $EB
+!byte $EA, $E8, $E6, $E4, $E2, $E0, $DE, $DC
+!byte $DA, $D8, $D5, $D3, $D1, $CE, $CC, $C9
+!byte $C7, $C4, $C1, $BF, $BC, $B9, $B6, $B3
+!byte $B1, $AE, $AB, $A8, $A5, $A2, $9F, $9C
+!byte $99, $96, $93, $90, $8C, $89, $86, $83
+!byte $80, $7D, $7A, $77, $74, $70, $6D, $6A
+!byte $67, $64, $61, $5E, $5B, $58, $55, $52
+!byte $4F, $4D, $4A, $47, $44, $41, $3F, $3C
+!byte $39, $37, $34, $32, $2F, $2D, $2B, $28
+!byte $26, $24, $22, $20, $1E, $1C, $1A, $18
+!byte $16, $15, $13, $11, $10, $0F, $0D, $0C
+!byte $0B, $0A, $08, $07, $06, $06, $05, $04
+!byte $03, $03, $02, $02, $02, $01, $01, $01
+!byte $01, $01, $01, $01, $02, $02, $02, $03
+!byte $03, $04, $05, $06, $06, $07, $08, $0A
+!byte $0B, $0C, $0D, $0F, $10, $11, $13, $15
+!byte $16, $18, $1A, $1C, $1E, $20, $22, $24
+!byte $26, $28, $2B, $2D, $2F, $32, $34, $37
+!byte $39, $3C, $3F, $41, $44, $47, $4A, $4D
+!byte $4F, $52, $55, $58, $5B, $5E, $61, $64
+!byte $67, $6A, $6D, $70, $74, $77, $7A, $7D
+
+; mario
+mlup
+!byte $ff,$24,$e5,$e1,$e9,$f9,$f6,$8d
+!byte $6c,$ed,$44,$20,$a5,$68,$4e,$7a
+!byte $29,$81,$84,$88,$2e,$fa,$a1,$9b
+!byte $49,$64
+mdata
+!byte $00,$00,$00,$00,$00,$00,$01,$01,$01,$01,$01,$00,$00,$00,$00,$00
+!byte $00,$00,$00,$00,$01,$01,$02,$03,$04,$05,$04,$01,$00,$00,$00,$00
+!byte $00,$00,$00,$01,$03,$03,$16,$16,$d0,$05,$00,$01,$00,$00,$00,$00
+!byte $00,$00,$01,$16,$02,$16,$11,$01,$01,$01,$01,$01,$01,$00,$00,$00
+!byte $00,$01,$0c,$16,$11,$01,$01,$01,$01,$01,$01,$01,$01,$01,$00,$00
+!byte $00,$01,$06,$01,$01,$0a,$04,$01,$04,$01,$09,$00,$00,$00,$00,$00
+!byte $01,$06,$07,$06,$01,$04,$06,$01,$06,$01,$06,$07,$08,$00,$00,$00
+!byte $01,$04,$13,$06,$01,$01,$15,$06,$15,$06,$15,$06,$06,$0d,$00,$00
+!byte $01,$40,$04,$06,$01,$06,$06,$0a,$04,$09,$04,$09,$04,$0d,$00,$00
+!byte $00,$01,$40,$04,$09,$06,$0a,$0b,$0b,$0b,$0b,$0b,$01,$00,$00,$00
+!byte $00,$00,$01,$12,$04,$04,$04,$04,$0b,$01,$01,$01,$00,$00,$00,$00
+!byte $00,$00,$0d,$11,$12,$12,$13,$13,$0d,$10,$01,$00,$00,$00,$00,$00
+!byte $00,$00,$0d,$0c,$0c,$04,$0d,$0e,$0f,$0f,$10,$01,$01,$00,$00,$00
+!byte $00,$01,$0d,$00,$00,$00,$07,$00,$00,$17,$00,$18,$01,$01,$00,$00
+!byte $01,$19,$13,$00,$00,$07,$0e,$00,$00,$17,$00,$01,$13,$13,$01,$00
+!byte $13,$13,$0d,$00,$00,$0d,$14,$0e,$52,$0f,$10,$0b,$13,$13,$01,$00
+!byte $13,$13,$18,$0d,$08,$14,$14,$14,$14,$09,$00,$13,$13,$13,$00,$00
+!byte $01,$13,$13,$01,$01,$09,$05,$05,$09,$01,$01,$13,$13,$01,$00,$00
+!byte $00,$01,$01,$00,$00,$00,$00,$00,$00,$00,$00,$01,$01,$00,$00,$00
+!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00

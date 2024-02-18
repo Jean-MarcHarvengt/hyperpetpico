@@ -1,0 +1,65 @@
+; This code is derived from the AppleII-VGA project
+; https://github.com/markadev/AppleII-VGA/blob/main/pico/abus.pio
+;
+; PET memory expansion bus interface
+;
+; WRITE CYCLE:
+;
+;                  500ns                    500ns
+;       <------------------------><------------------------>
+;                                  _________________________                       
+;       |                         |                         |                         |
+; PHI2  |_________________________|                         |_________________________|
+;                                 ^
+;       __                                                     _________________________
+;         |                                                   |        
+; R/W     |___________________________________________________|                                                   |
+;                                 40ns  280ns
+;                                 <-><-------------->      
+;                                 ^ ^               ^
+;                                 | |               |
+;                            AddrHi |               |
+;                              AddrLo               |
+;                                         AddrLo(+R/W)
+.define public PHI2_GPIO 26
+
+.program petbus
+; Prerequisites:
+;  * Bus clock used is PHI2, wired to GPIO 26
+;  * JMP pin is mapped to the R/W signal
+;  * IN pins are mapped to input[7:0] + R/W 
+;  * SET pins are mapped to the 3 transceiver enable signals
+;  * selecting AddrHi[7:0], AddrLo[7:0] or Data[7:0] on input[7:0]
+;  * input shift left & autopush @ 25 bits
+;  * run at about 250MHz (4ns/instruction)
+;
+; SET bits for tranceiver control:
+;  0bxxx
+;    x    - select AddrHi, active low
+;     x   - select AddrLo, active low
+;      x  - select Data, active low
+;
+.wrap_target
+next_bus_cycle:
+    set PINS, 0b011                     ; enable AddrHi tranceiver (PHI2 just felt before wrapping)
+    wait 1 GPIO, PHI2_GPIO              ; wait for PHI2 to rise
+
+    in PINS, 8                          ; read AddrHi[7:0]
+    set PINS, 0b101  [10]               ; enable AddrLo tranceiver + wait 10*4ns
+    in PINS, 8                          ; read AddrLo[7:0]
+
+    jmp PIN, read_cycle                 ; jump based on the state of the R/W pin (1=read)
+
+write_cycle:
+    set PINS, 0b110  [30]               ; enable Data tranceiver + wait 70*4ns
+    nop              [20]
+    nop              [20]
+    in PINS, 9                          ; Data[7:0] + R/W, then autopush
+    set PINS, 0b011                     ; Mostly to debug on logic analyser!
+    wait 0 GPIO, PHI2_GPIO  [10]        ; wait for PHI2 to fall and wait 10*4ns
+    jmp next_bus_cycle
+
+read_cycle:
+    in PINS, 9                          ; dontcare[7:0] + R/W, then autopush
+    wait 0 GPIO, PHI2_GPIO   [10]       ; wait for PHI2 to fall and wait 10*4ns
+.wrap
