@@ -6,7 +6,7 @@ Today the PET deserves a modern hardware expansion board!<br>
 This project intent to upgrade the PET to a modern 6502 computer.<br>
 <br>
 Initially the purpose of the project was only to offer VGA output.<br>
-At this point of time, the hyperpetpico project supports<br>
+At this point of time, the hyperpetpico project supports:<br>
 * VGA output up to 640x200 (80 colums)
 * SID sound emulation
 * extended graphical modes supporting (640/320/256)x200 resolution in 256 colors.
