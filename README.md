@@ -46,7 +46,7 @@ To ease development, the second module can be used as a standalone PET emulator<
   * git submodule update --init
 * export PICO_SDK_PATH=/Users/jean-marcharvengt/Documents/pico/pico-sdk (e.g. path to pico-sdk!)
 * clone this project
-  * git@github.com:Jean-MarcHarvengt/hyperpetpico.git
+  * git clone git@github.com:Jean-MarcHarvengt/hyperpetpico.git
   * cd hyperpetpico
   * edit CMakeLists.txt and uncomment desired target
     * #set(TARGET hyperpetpico)        => to use in a real PET
