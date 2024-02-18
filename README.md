@@ -41,12 +41,12 @@ To ease development, the second module can be used as a standalone PET emulator<
 
 ## Build procedure
 * install PICO-SDK (or update it by pulling from the github)
- * git clone -b master https://github.com/raspberrypi/pico-sdk.git
- * cd pico-sdk/
- * git submodule update --init
+  * git clone -b master https://github.com/raspberrypi/pico-sdk.git
+  * cd pico-sdk/
+  * git submodule update --init
 * export PICO_SDK_PATH=/Users/jean-marcharvengt/Documents/pico/pico-sdk (e.g. path to pico-sdk!)
-* build (you cloned this project!)
-cd hyperpetpico
+* clone this project
+  * cd hyperpetpico
 
 
 ## Special credits
