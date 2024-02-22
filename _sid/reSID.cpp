@@ -27,8 +27,8 @@
 #include "reSID.h"
 #include <math.h>
 
-#define AUDIO_BLOCK_SAMPLES 443
-#define SAMPLERATE 22050
+#define AUDIO_BLOCK_SAMPLES 525// 443
+#define SAMPLERATE 31500 //22050
 #define CLOCKFREQ 985248
 
 void AudioPlaySID::begin(void)

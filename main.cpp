@@ -5,8 +5,11 @@
 // ****************************************************************************
 #include "include.h"
 #include "petfont.h"
-#include "petbus.pio.h"
 #include "reSID.h"
+
+#include "pwm_audio.h"
+#include "petbus.h"
+#ifndef HAS_PETIO
 #include "mos6502.h"
 #include "basic4_b000.h"
 #include "basic4_c000.h"
@@ -14,28 +17,15 @@
 #include "edit4.h"
 #include "edit480.h"
 #include "kernal4.h"
-
-#ifndef HAS_PETIO
 #ifdef HAS_NETWORK
-#include "pico/cyw43_arch.h"
 #include "lwip/apps/tftp_server.h"
-#include "dhcpserver.h"
+#include "network.h"
 #endif
 #include "usb_kbd.h"
 #include "kbd.h"
 #endif
 #include "decrunch.h"
 
-#ifdef HAS_PETIO
-// Petbus PIO config
-#define CONFIG_PIN_PETBUS_DATA_BASE 0 /* 8+1(RW) pins */
-#define CONFIG_PIN_PETBUS_RW (CONFIG_PIN_PETBUS_DATA_BASE + 8)
-#define CONFIG_PIN_PETBUS_CONTROL_BASE (CONFIG_PIN_PETBUS_DATA_BASE + 9) //CE DATA,ADDRLO,ADDRHI
-#define CONFIG_PIN_PETBUS_PHI2  26
-#define CONFIG_PIN_PETBUS_RESET 22
-const PIO pio = pio1;
-const uint sm = 0;
-#endif
 
 // Graphics
 #define VGA_RGB(r,g,b)   ( (((r>>5)&0x07)<<5) | (((g>>5)&0x07)<<2) | (((b>>6)&0x3)<<0) )
@@ -147,399 +137,19 @@ static ALIGNED u8 TileData[TILE_MAXDATA];
 // PET shadow memory 8000-9fff
 static unsigned char mem[0x2000];
 static bool pet_reset = false;
-//
-// 8000-9fff: memory map GFX+SOUND expansion
-//
-// RESOLUTION:
-// 640x200 HI_RES   (PET8032)
-// 320x200 LO_RES   (PET4032)
-// 256x200 GAME_RES (New resolution suitable for 80's ARCADE games)
-//
-// LAYERING:
-// - background color
-// - L0 = bitmap (1) or tile 8x8/16x16 (scollable) 
-// - L1 = petfont 8x8 or tile 8x8/16x16 (scollable)
-// - L2 = sprites (with H/V flip)
-// (1) 320x200 also in HIRES
 
-//
-// 8000-87ff: videomem standard petfont text map L1 (fmap1)
-//            (83ff for 4032, 87ff for 8032) 
-// 8800-8fff: videomem expanded tiles map L1 (tmap1)
-// 9000-97ff: videomem expanded tiles map L0 (tmap0)
-//
-// 9800-99ff: MAX 128 sprites registers (id,xhi,xlo,y)
-//            id:    0-5
-//            hflip: 6
-//            vflip: 7
-// 9a00-9aff: transfer lookup (if used as color palette, 256 RGB332 colors)
-// 9b00: video mode 
-//       0-1: resolution (0=640x200,1=320x200,2=256x200)
-// 9b01: background color (RGB332)
-// 9b02: layers config
-//       0: L0 on/off
-//       1: L1 on/off                   (off if HIRES and bitmap in L0!)
-//       2: L2 on/off
-//       3: L2 sprites between L0 and L1
-//       4: bitmap/tile in L0
-//       5: petfont/tile in L1
-//       6: enable scroll area in L0
-//       7: enable scroll area in L1
-// 9b03: lines config 2
-//       0: single/perline background color
-//       1: single/perline L0 xscroll
-//       2: single/perline L1 xscroll
-// 9b04: xscroll hi registers
-//       3-0: L0 xscroll hi
-//       7-4: L1 xscroll hi
-// 9b05: L0 xscroll lo
-// 9b06: L1 xscroll lo
-// 9b07: L0 yscroll
-// 9b08: L1 yscroll
-// 9b09: L0 scroll area's line start (0-24)
-//       4-0
-// 9b0a: L0 scroll area's line end
-//       4-0
-// 9b0b: L1 scroll area's line start (0-24)
-//       4-0
-// 9b0c: L1 scroll area's line end
-//       4-0
-// 9b0d: foreground color (RGB332)
-//
-// 9b0e: tiles config
-//       0: L0: 0=8x8, 1=16x16
-//       1: L1: 0=8x8, 1=16x16
-//       2-4: xcurtain
-//        0: on/off
-//        1: 8/16 pixels left
-//       5-7: ycurtain
-//        0: on/off
-//        1: 8/16 pixels top
-// 9b0f: spare!!!
-// 9b10: 3-0: transfer mode 
-//       1/2/4/8 bits per pixel (using indexed CLUT)
-//       9 = 8 bits RGB332 no CLUT
-//       0 = compressed
-// 9b11: transfer command
-//       0: idle
-//       1: transfer tiles data      (data=tilenr,w,h,packet pixels)
-//       2: transfer sprites data    (data=spritenr,w,h,packet pixels)
-//       3: transfer bitmap data     (data=xh,xl,y,wh,wl,h,w*h/packet pixels) 
-//       4: transfer t/fmap col data (data=layer,col,row,size,size/packet tiles)
-//       5: transfer t/fmap row data (data=layer,col,row,size,size/packet tiles)
-//       6: transfer all tile 8bits data compressed (data=sizeh,sizel,pixels)
-//       7: transfer all sprite 8bits data compressed (data=sizeh,sizel,pixels)
-//       8: transfer bitmap 8bits data compressed (data=sizeh,sizel,pixels)
-
-// 9b12: transfer params
-// 9b13: transfer data
-//
-// Redefining tiles/sprite sequence
-// 1. write lookup palette entries needed
-// 2. write transfer mode
-// 3. write command 1/2
-// 4. write params tile/sprite NR,w,h
-// 5. write data sequence (8bytes*plane for tiles, 24*2*plane for sprites)
-// 6. write new command to reset
-//
-// Transfer bitmap sequence
-// 1. write lookup palette entries needed
-// 2. write transfer mode
-// 3. write command 3
-// 4. write params XH,XL,Y,WH,WL,H
-// 5. write data sequence (N bytes/packed_bits)
-// 6. write transfer=0 to reset
-//
-// 9b38-9bff: lines background color (RGB332)
-// 9c00-9cc7: 7-4:  lines L1 xscroll hi, 3-0: L0 xscroll hi
-// 9cc8-9d8F: lines L0 xscroll lo
-// 9d90-9e58: lines L1 xscroll lo
-//
-// 9f00-9f1d: SID registers (d400 on C64)
-//
-// 9f80-9fff: Sprite collision
-// 
-#define REG_TEXTMAP_L1    (0x8000 - 0x8000) // 32768
-#define REG_TILEMAP_L1    (0x8800 - 0x8000) // 34816
-#define REG_TILEMAP_L0    (0x9000 - 0x8000) // 36864
-#define REG_SPRITE_IND    (0x9800 - 0x8000) // 38912
-#define REG_SPRITE_XHI    (0x9880 - 0x8000) // 39040
-#define REG_SPRITE_XLO    (0x9900 - 0x8000) // 39168
-#define REG_SPRITE_Y      (0x9980 - 0x8000) // 39296
-#define REG_TLOOKUP       (0x9a00 - 0x8000) // 39424
-#define REG_VIDEO_MODE    (0x9b00 - 0x8000) // 39680
-#define REG_BG_COL        (0x9b01 - 0x8000) // 39681
-#define REG_LAYERS_CFG    (0x9b02 - 0x8000) // 39682
-#define REG_LINES_CFG     (0x9b03 - 0x8000) // 39683
-#define REG_XSCROLL_HI    (0x9b04 - 0x8000) // 39684
-#define REG_XSCROLL_L0    (0x9b05 - 0x8000) // 39685
-#define REG_XSCROLL_L1    (0x9b06 - 0x8000) // 39686
-#define REG_YSCROLL_L0    (0x9b07 - 0x8000) // 39687
-#define REG_YSCROLL_L1    (0x9b08 - 0x8000) // 39688
-#define REG_SC_START_L0   (0x9b09 - 0x8000) // 39689
-#define REG_SC_END_L0     (0x9b0a - 0x8000) // 39690
-#define REG_SC_START_L1   (0x9b0b - 0x8000) // 39691
-#define REG_SC_END_L1     (0x9b0c - 0x8000) // 39692
-#define REG_FG_COL        (0x9b0d - 0x8000) // 39693
-#define REG_TILES_CFG     (0x9b0e - 0x8000) // 39694
-
-#define REG_TDEPTH        (0x9b10 - 0x8000) // 39696
-#define REG_TCOMMAND      (0x9b11 - 0x8000) // 39697
-#define REG_TPARAMS       (0x9b12 - 0x8000) // 39698
-#define REG_TDATA         (0x9b13 - 0x8000) // 39699
-
-#define REG_LINES_BG_COL  (0x9b38 - 0x8000) // 39736
-#define REG_LINES_XSCR_HI (0x9c00 - 0x8000) // 39936
-#define REG_LINES_L0_XSCR (0x9cc8 - 0x8000) // 40136
-#define REG_LINES_L1_XSCR (0x9d90 - 0x8000) // 40336
-
-#define REG_SID_BASE      (0x9f00 - 0x8000) // 40192
-
-#define GET_VIDEO_MODE    ( mem[REG_VIDEO_MODE] )
-#define GET_BG_COL        ( mem[REG_BG_COL] )
-#define GET_FG_COL        ( mem[REG_FG_COL] )
-#define GET_XSCROLL_L0    ( mem[REG_XSCROLL_L0] | ((mem[REG_XSCROLL_HI] & 0x0f)<<8) )
-#define GET_YSCROLL_L0    ( mem[REG_YSCROLL_L0] )
-#define GET_XSCROLL_L1    ( mem[REG_XSCROLL_L1] | ((mem[REG_XSCROLL_HI] & 0xf0)<<4) )
-#define GET_YSCROLL_L1    ( mem[REG_YSCROLL_L1] )
-#define GET_SC_START_L0   ( mem[REG_SC_START_L0] & 31 )
-#define GET_SC_END_L0     ( mem[REG_SC_END_L0] & 31 )
-#define GET_SC_START_L1   ( mem[REG_SC_START_L1] & 31 )
-#define GET_SC_END_L1     ( mem[REG_SC_END_L1] & 31 )
-
-#define SET_VIDEO_MODE(x) { mem[REG_VIDEO_MODE] = x; }
-#define SET_BG_COL(x)     { mem[REG_BG_COL] = x; }
-#define SET_FG_COL(x)     { mem[REG_FG_COL] = x; }
-#define SET_XSCROLL_L0(x) { mem[REG_XSCROLL_L0] = x & 0xff; mem[REG_XSCROLL_HI] &= 0xf0; mem[REG_XSCROLL_HI] |= (x>>8); }
-#define SET_XSCROLL_L1(x) { mem[REG_XSCROLL_L1] = x & 0xff; mem[REG_XSCROLL_HI] &= 0x0f; mem[REG_XSCROLL_HI] |= ((x>>4)&0xf0); }
-#define SET_YSCROLL_L0(x) { mem[REG_YSCROLL_L0] = x; }
-#define SET_YSCROLL_L1(x) { mem[REG_YSCROLL_L1] = x; }
-#define SET_SC_START_L0(x) { mem[REG_SC_START_L0] = x & 31; }
-#define SET_SC_END_L0(x)  { mem[REG_SC_END_L0] = x & 31; }
-#define SET_SC_START_L1(x) { mem[REG_SC_START_L1] = x & 31; }
-#define SET_SC_END_L1(x)  { mem[REG_SC_END_L1] = x & 31; }
-
-#define SET_LAYER_MODE(x) { mem[REG_LAYERS_CFG] = x; }
-#define SET_LINE_MODE(x)  { mem[REG_LINES_CFG] = x; }
-#define SET_TILE_MODE(x)  { mem[REG_TILES_CFG] = x; }
-
-
-#define VIDEO_MODE_HIRES  ( mem[REG_VIDEO_MODE] == 0 )  
-#define LAYER_L0_ENA      ( mem[REG_LAYERS_CFG] & 0x1  )  
-#define LAYER_L1_ENA      ( mem[REG_LAYERS_CFG] & 0x2  )  
-#define LAYER_L2_ENA      ( mem[REG_LAYERS_CFG] & 0x4  )
-#define L2_BETWEEN_ENA    ( mem[REG_LAYERS_CFG] & 0x8  )
-#define L0_TILE_ENA       ( mem[REG_LAYERS_CFG] & 0x10 )  
-#define L1_TILE_ENA       ( mem[REG_LAYERS_CFG] & 0x20 )
-#define L0_AREA_ENA       ( mem[REG_LAYERS_CFG] & 0x40 )   
-#define L1_AREA_ENA       ( mem[REG_LAYERS_CFG] & 0x80 )   
-
-#define BG_COL_LINE_ENA   ( mem[REG_LINES_CFG]  & 0x01 )
-#define L0_XSCR_LINE_ENA  ( mem[REG_LINES_CFG]  & 0x02 )
-#define L1_XSCR_LINE_ENA  ( mem[REG_LINES_CFG]  & 0x04 )
-
-#define L0_TILE_16_ENA     ( mem[REG_TILES_CFG]  & 0x01 )
-#define L1_TILE_16_ENA     ( mem[REG_TILES_CFG]  & 0x02 )
-#define HCURTAIN8_ENA      ( (mem[REG_TILES_CFG] & (0x04+0x08)) == (0x04) )
-#define HCURTAIN16_ENA     ( (mem[REG_TILES_CFG] & (0x04+0x08)) == (0x04+0x08) )
-#define VCURTAIN8_ENA      ( (mem[REG_TILES_CFG] & (0x20+0x40)) == (0x20) )
-#define VCURTAIN16_ENA     ( (mem[REG_TILES_CFG] & (0x20+0x40)) == (0x20+0x40) )
-
-#define LAYER_L0_BITMAP   ( 0x1 )  
-#define LAYER_L0_TILE     ( 0x1 | 0x10 )  
-#define LAYER_L1_PETFONT  ( 0x2 )  
-#define LAYER_L1_TILE     ( 0x2 | 0x20)
-#define LAYER_L2_SPRITE   ( 0x4 )
-#define LAYER_L2_INBETW   ( 0x8 )
-#define LAYER_L0_AREA     ( 0x40)
-#define LAYER_L1_AREA     ( 0x80)
-
-#define LINE_BG_COL       ( 0x1 )
-#define LINE_L0_XSCR      ( 0x2 )
-#define LINE_L1_XSCR      ( 0x4 )
-
-#define L0_TILE_16        ( 0x1 )  
-#define L1_TILE_16        ( 0x2 )  
-#define HCURTAIN_8        ( 0x4 )  
-#define HCURTAIN_16       ( 0x4 + 0x8 ) 
-#define VCURTAIN_8        ( 0x20 )  
-#define VCURTAIN_16       ( 0x20 + 0x40 )  
 
 // ****************************************
 // Audio code
 // ****************************************
 static AudioPlaySID playSID;
 
-static bool fillfirsthalf = true;
-static uint16_t cnt = 0;
-static uint16_t sampleBufferSize = 0;
-static void (*fillsamples)(short * stream, int len) = nullptr;
-static uint32_t * snd_tx_buffer;
-static short * snd_tx_buffer16;
-
-static void AUDIO_isr() {
-  pwm_clear_irq(pwm_gpio_to_slice_num(AUDIO_PIN));
-  long s = snd_tx_buffer16[cnt++]; 
-  s += snd_tx_buffer16[cnt++];
-  s = s/2 + 32767; 
-  pwm_set_gpio_level(AUDIO_PIN, s >> 8);
-  cnt = cnt & (sampleBufferSize*2-1);
-
-  if (cnt == 0) 
-  {
-    fillfirsthalf = false;
-    //irq_set_pending(RTC_IRQ+1);
-    multicore_fifo_push_blocking(0);
-  } 
-  else if (cnt == sampleBufferSize) {
-    fillfirsthalf = true;
-    //irq_set_pending(RTC_IRQ+1);
-    multicore_fifo_push_blocking(0);
-  }
-}
-
-static void core1_sio_irq() {
-  irq_clear(SIO_IRQ_PROC1);
-  while(multicore_fifo_rvalid()) {
-    uint16_t raw = multicore_fifo_pop_blocking();
-    if (fillfirsthalf) {
-      fillsamples((short *)snd_tx_buffer, sampleBufferSize);
-    }  
-    else { 
-      fillsamples((short *)&snd_tx_buffer[sampleBufferSize/2], sampleBufferSize);
-    }
-  } 
-  multicore_fifo_clear_irq();
-}
-
-
-#define AUDIO_BUFFER_SIZE 1024
-#define REPETITION_RATE 4
-
-static uint32_t single_sample = 0;
-static uint32_t *single_sample_ptr = &single_sample;
-static int pwm_dma_chan, trigger_dma_chan, sample_dma_chan;
-
-static uint8_t audio_buffers[2][AUDIO_BUFFER_SIZE];
-static volatile int cur_audio_buffer;
-static volatile int last_audio_buffer;
-
-static void __isr __time_critical_func(dma_handler)()
+void __not_in_flash("AudioRender") AudioRender(void)
 {
-  cur_audio_buffer = 1 - cur_audio_buffer;
-  dma_hw->ch[sample_dma_chan].al1_read_addr       = (intptr_t) &audio_buffers[cur_audio_buffer][0];
-  dma_hw->ch[trigger_dma_chan].al3_read_addr_trig = (intptr_t) &single_sample_ptr;
-
-  dma_hw->ints1 = 1u << trigger_dma_chan;
+  pwm_audio_handle_sample();
 }
 
-static void AudioInit(int samplesize, void (*callback)(short * stream, int len))
-{
-  fillsamples = callback;
-  snd_tx_buffer =  (uint32_t*)malloc(samplesize*sizeof(uint32_t));
-
-  if (snd_tx_buffer == NULL) {
-    printf("sound buffer could not be allocated!!!!!\n");
-    return;  
-  }
-  memset((void*)snd_tx_buffer,0, samplesize*sizeof(uint32_t));
-
-
-  snd_tx_buffer16 = (short*)snd_tx_buffer;
-  sampleBufferSize = samplesize;
-
-  gpio_set_function(AUDIO_PIN, GPIO_FUNC_PWM);
-  
-  int audio_pin_slice = pwm_gpio_to_slice_num(AUDIO_PIN);
-
-  int audio_pin_chan = pwm_gpio_to_channel(AUDIO_PIN);
-
-
-  // Setup PWM interrupt to fire when PWM cycle is complete
-  pwm_clear_irq(audio_pin_slice);
-  pwm_set_irq_enabled(audio_pin_slice, true);
-  irq_set_exclusive_handler(PWM_IRQ_WRAP, AUDIO_isr);
-  irq_set_priority (PWM_IRQ_WRAP, 128);
-  irq_set_enabled(PWM_IRQ_WRAP, true);
-
-  //irq_set_exclusive_handler(RTC_IRQ+1,SOFTWARE_isr);
-  //irq_set_priority (RTC_IRQ+1, 120);
-  //irq_set_enabled(RTC_IRQ+1,true);
-
-  // Setup PWM for audio output
-  pwm_config config = pwm_get_default_config();
-  pwm_config_set_clkdiv(&config, 50.0f);
-  pwm_config_set_wrap(&config, 254);
-  pwm_init(audio_pin_slice, &config, true);
-
-  pwm_set_gpio_level(AUDIO_PIN, 0);
-
-/*
-
-  pwm_dma_chan     = 4; //dma_claim_unused_channel(true);
-  trigger_dma_chan = 4; //dma_claim_unused_channel(true);
-  sample_dma_chan  = 4; //dma_claim_unused_channel(true);
-
-  // setup PWM DMA channel
-  dma_channel_config pwm_dma_chan_config = dma_channel_get_default_config(pwm_dma_chan);
-  channel_config_set_transfer_data_size(&pwm_dma_chan_config, DMA_SIZE_32);              // transfer 32 bits at a time
-  channel_config_set_read_increment(&pwm_dma_chan_config, false);                        // always read from the same address
-  channel_config_set_write_increment(&pwm_dma_chan_config, false);                       // always write to the same address
-  channel_config_set_chain_to(&pwm_dma_chan_config, sample_dma_chan);                    // trigger sample DMA channel when done
-  channel_config_set_dreq(&pwm_dma_chan_config, DREQ_PWM_WRAP0 + audio_pin_slice);       // transfer on PWM cycle end
-  dma_channel_configure(pwm_dma_chan,
-                        &pwm_dma_chan_config,
-                        &pwm_hw->slice[audio_pin_slice].cc,   // write to PWM slice CC register
-                        &single_sample,                       // read from single_sample
-                        REPETITION_RATE,                      // transfer once per desired sample repetition
-                        false                                 // don't start yet
-                        );
-
-  // setup trigger DMA channel
-  dma_channel_config trigger_dma_chan_config = dma_channel_get_default_config(trigger_dma_chan);
-  channel_config_set_transfer_data_size(&trigger_dma_chan_config, DMA_SIZE_32);          // transfer 32-bits at a time
-  channel_config_set_read_increment(&trigger_dma_chan_config, false);                    // always read from the same address
-  channel_config_set_write_increment(&trigger_dma_chan_config, false);                   // always write to the same address
-  channel_config_set_dreq(&trigger_dma_chan_config, DREQ_PWM_WRAP0 + audio_pin_slice);   // transfer on PWM cycle end
-  dma_channel_configure(trigger_dma_chan,
-                        &trigger_dma_chan_config,
-                        &dma_hw->ch[pwm_dma_chan].al3_read_addr_trig,     // write to PWM DMA channel read address trigger
-                        &single_sample_ptr,                               // read from location containing the address of single_sample
-                        REPETITION_RATE * AUDIO_BUFFER_SIZE,              // trigger once per audio sample per repetition rate
-                        false                                             // don't start yet
-                        );
-  dma_channel_set_irq1_enabled(trigger_dma_chan, true);    // fire interrupt when trigger DMA channel is done
-  irq_set_exclusive_handler(DMA_IRQ_1, dma_handler);
-  irq_set_enabled(DMA_IRQ_1, true);
-
-  // setup sample DMA channel
-  dma_channel_config sample_dma_chan_config = dma_channel_get_default_config(sample_dma_chan);
-  channel_config_set_transfer_data_size(&sample_dma_chan_config, DMA_SIZE_8);  // transfer 8-bits at a time
-  channel_config_set_read_increment(&sample_dma_chan_config, true);            // increment read address to go through audio buffer
-  channel_config_set_write_increment(&sample_dma_chan_config, false);          // always write to the same address
-  dma_channel_configure(sample_dma_chan,
-                        &sample_dma_chan_config,
-                        (char*)&single_sample + 2*audio_pin_chan,  // write to single_sample
-                        &audio_buffers[0][0],                      // read from audio buffer
-                        1,                                         // only do one transfer (once per PWM DMA completion due to chaining)
-                        false                                      // don't start yet
-                        );
-
-
-  // clear audio buffers
-  memset(audio_buffers[0], 128, AUDIO_BUFFER_SIZE);
-  memset(audio_buffers[1], 128, AUDIO_BUFFER_SIZE);
-
-  // kick things off with the trigger DMA channel
-  dma_channel_start(trigger_dma_chan);
-*/  
-
-
-
-
-}
-
-static void  SND_Process( short * stream, int len )
+static void audio_fill_buffer( short * stream, int len )
 {
     playSID.update((void *)stream, len);
 }
@@ -564,12 +174,11 @@ static void sid_dump( void )
 // ****************************************
 static void VgaCoreWithSound()
 {
-  multicore_fifo_clear_irq();
-  irq_set_exclusive_handler(SIO_IRQ_PROC1,core1_sio_irq);
-  irq_set_enabled(SIO_IRQ_PROC1,true);
+  //multicore_fifo_clear_irq();
+  //irq_set_exclusive_handler(SIO_IRQ_PROC1,core1_sio_irq);
+  //irq_set_enabled(SIO_IRQ_PROC1,true);
   VgaCore();
 }
-
 
 static void ResetGFXMem(void) 
 {
@@ -1314,100 +923,6 @@ static void handle_custom_registers(uint16_t address, uint8_t value)
   } 
 }
 
-#ifdef HAS_PETIO
-static void rx_irq(void) {
-  while(!pio_sm_is_rx_fifo_empty(pio, sm)) {
-    uint32_t value = pio_sm_get(pio, sm);
-    const bool is_write = ((value & (1u << (CONFIG_PIN_PETBUS_RW - CONFIG_PIN_PETBUS_DATA_BASE))) == 0);
-    uint_fast16_t address = (value >> 9) & 0xffff;
-    if ( (is_write) && (gpio_get(CONFIG_PIN_PETBUS_RESET)) )
-    {
-      if ( address >= 0x8000) 
-      {
-        value &= 0xff;
-        if (address == 0xe84C) 
-        {
-            // e84C 12=LO, 14=HI
-            if (value & 0x02) 
-            {
-              font_lowercase = true;
-            }
-            else 
-            {
-              font_lowercase = false;
-            }
-        }    
-        if ( address < 0xa000) {
-          mem[address-0x8000] = value;
-          handle_custom_registers(address, value);
-        } 
-      }
-    }  
-  }
-}
-
-static void init_petpio(void)
-{
-  // Init PETBUS
-  uint offset = pio_add_program(pio, &petbus_program);
-  pio_sm_claim(pio, sm);
-  pio_sm_config c = petbus_program_get_default_config(offset);
-  // set the bus R/W pin as the jump pin
-  sm_config_set_jmp_pin(&c, CONFIG_PIN_PETBUS_RW);
-  // map the IN pin group to the data signals
-  sm_config_set_in_pins(&c, CONFIG_PIN_PETBUS_DATA_BASE);
-  // map the SET pin group to the bus transceiver enable signals
-  sm_config_set_set_pins(&c, CONFIG_PIN_PETBUS_CONTROL_BASE, 3);
-  // configure left shift into ISR & autopush every 25 bits
-  sm_config_set_in_shift(&c, false, true, 24+1);
-  pio_sm_init(pio, sm, offset, &c);
-  // configure the GPIOs
-  // Ensure all transceivers will start disabled
-  pio_sm_set_pins_with_mask(
-      pio, sm, (uint32_t)0x7 << CONFIG_PIN_PETBUS_CONTROL_BASE, (uint32_t)0x7 << CONFIG_PIN_PETBUS_CONTROL_BASE);
-  pio_sm_set_pindirs_with_mask(pio, sm, (0x7 << CONFIG_PIN_PETBUS_CONTROL_BASE),
-      (1 << CONFIG_PIN_PETBUS_PHI2) | (1 << CONFIG_PIN_PETBUS_RESET) | (0x7 << CONFIG_PIN_PETBUS_CONTROL_BASE) | (0x1ff << CONFIG_PIN_PETBUS_DATA_BASE));
-
-  // Disable input synchronization on input pins that are sampled at known stable times
-  // to shave off two clock cycles of input latency
-  pio->input_sync_bypass |= (0x1ff << CONFIG_PIN_PETBUS_DATA_BASE);
-  
-  pio_gpio_init(pio, CONFIG_PIN_PETBUS_PHI2);
-  gpio_set_pulls(CONFIG_PIN_PETBUS_PHI2, false, false);
-  pio_gpio_init(pio, CONFIG_PIN_PETBUS_RESET);
-  gpio_set_pulls(CONFIG_PIN_PETBUS_RESET, false, false);
-
-  for(int pin = CONFIG_PIN_PETBUS_CONTROL_BASE; pin < CONFIG_PIN_PETBUS_CONTROL_BASE + 3; pin++) {
-      pio_gpio_init(pio, pin);
-  }
-  for(int pin = CONFIG_PIN_PETBUS_DATA_BASE; pin < CONFIG_PIN_PETBUS_DATA_BASE + 9; pin++) {
-      pio_gpio_init(pio, pin);
-      gpio_set_pulls(pin, false, false);
-  }
-
-  // Find a free irq
-  static int8_t pio_irq;
-  static_assert(PIO0_IRQ_1 == PIO0_IRQ_0 + 1 && PIO1_IRQ_1 == PIO1_IRQ_0 + 1, "");
-  pio_irq = (pio == pio0) ? PIO0_IRQ_0 : PIO1_IRQ_0;
-  if (irq_get_exclusive_handler(pio_irq)) {
-      pio_irq++;
-      if (irq_get_exclusive_handler(pio_irq)) {
-          panic("All IRQs are in use");
-      }
-  }
-
-  // Enable interrupt
-  irq_add_shared_handler(pio_irq, rx_irq, PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY); // Add a shared IRQ handler
-  irq_set_enabled(pio_irq, true); // Enable the IRQ
-  const uint irq_index = pio_irq - ((pio == pio0) ? PIO0_IRQ_0 : PIO1_IRQ_0); // Get index of the IRQ
-  pio_set_irqn_source_enabled(pio, irq_index, (pio_interrupt_source)(pis_sm0_rx_fifo_not_empty + sm), true); // Set pio to tell us when the FIFO is NOT empty
-
-  pio_sm_set_enabled(pio, sm, true);
-  pio_enable_sm_mask_in_sync(pio, (1 << sm));
-}
-#endif
-
-
 #ifndef HAS_PETIO 
 // ****************************************
 // 6502/pet emu
@@ -1428,7 +943,6 @@ static const uint8_t input_cmd[] = {'L', 'I', 'S', 'T', 0x0d, 'R', 'U', 'N', 0x0
 static uint8_t input_chr;
 static uint8_t _rows[0x10];
 static uint8_t _row;
-
 
 /*
 Professionnal keyboard map
@@ -1611,8 +1125,58 @@ static void pet_kup(uint8_t asciicode) {
   if (asciicode < 0x80)
     _reset(ascii2rowcol(asciicode));  
 }
+#endif
 
 
+#ifndef HAS_PETIO
+// ****************************************
+// USB keyboard
+// ****************************************
+void kbd_raw_key_down (int code, int flags)
+{
+  switch (code)
+  {
+    case KBD_KEY_UP:
+      pet_kup(kbd_to_ascii (code, flags));
+      break;
+    case KBD_KEY_DOWN:
+      pet_kdown(kbd_to_ascii (code, flags));
+      break;
+    default:
+      break;
+  }
+}
+#endif
+
+#ifdef HAS_PETIO
+static bool repeating_timer_callback(struct repeating_timer *t) 
+{
+  pet_reset = petbus_poll_reset();
+  return true;
+}
+
+static void pet_mem_write(uint16_t address, uint8_t value)
+{
+  if (address == 0xe84C) 
+  {
+      // e84C 12=LO, 14=HI
+      if (value & 0x02) 
+      {
+        font_lowercase = true;
+      }
+      else 
+      {
+        font_lowercase = false;
+      }
+  }    
+  if ( address < 0xa000) {
+    mem[address-0x8000] = value;
+    handle_custom_registers(address, value);
+  } 
+}
+#endif
+
+#ifndef HAS_PETIO
 #ifdef HAS_NETWORK
 // ****************************************
 // TFTP server
@@ -1748,102 +1312,7 @@ static const struct tftp_context tftp = {
   tftp_write,
   tftp_error
 };
-
-static uint32_t init_server(void) 
-{
-  uint32_t ip = 0;
-  if (cyw43_arch_init()) {
-      printf("failed to initialise\n");
-      return ip;
-  }
-#ifdef WIFI_AP
-  cyw43_arch_enable_ap_mode("hyperpetpico", "picopet123", CYW43_AUTH_WPA2_MIXED_PSK );
-  //CYW43_AUTH_WPA2_MIXED_PSK
-  //CYW43_AUTH_OPEN
-  printf("Connecting to WiFi...\n");
-  struct netif *netif = netif_default;
-  ip4_addr_t addr = { .addr = 0x017BA8C0 }, mask = { .addr = 0x00FFFFFF };
-  ip = 0x017BA8C0; // 192.168.123.1
-  printf("IP Address: %lu.%lu.%lu.%lu\n", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, ip >> 24);
-  netif_set_addr(netif, &addr, &mask, &addr);
-  //set_secondary_ip_address(0x006433c6);
-
-  // Start the dhcp server
-  static dhcp_server_t dhcp_server;
-  dhcp_server_init(&dhcp_server, &netif->ip_addr, &netif->netmask, "picodomain");
-#else
-  cyw43_arch_enable_sta_mode();
-  // this seems to be the best be can do using the predefined `cyw43_pm_value` macro:
-  // cyw43_wifi_pm(&cyw43_state, CYW43_PERFORMANCE_PM);
-  // however it doesn't use the `CYW43_NO_POWERSAVE_MODE` value, so we do this instead:
-  cyw43_wifi_pm(&cyw43_state, cyw43_pm_value(CYW43_NO_POWERSAVE_MODE, 20, 1, 1, 1));
-  printf("Connecting to WiFi...\n");
-
-  int retry = 10;
-  while (retry-- > 0) { 
-    if (cyw43_arch_wifi_connect_timeout_ms("yourap", "yourpasswd", CYW43_AUTH_WPA2_AES_PSK, 30000)) {
-        printf("failed to connect, retrying %d...\n",retry);
-        sleep_ms(500);
-    } else 
-    {
-        printf("Connected.\n");
-        extern cyw43_t cyw43_state;
-        auto ip_addr = cyw43_state.netif[CYW43_ITF_STA].ip_addr.addr;
-        printf("IP Address: %lu.%lu.%lu.%lu\n", ip_addr & 0xFF, (ip_addr >> 8) & 0xFF, (ip_addr >> 16) & 0xFF, ip_addr >> 24);
-        ip = ip_addr;
-        break;
-    }
-  }  
 #endif
-
-  if (ip)
-  {
-    tftp_init_common(LWIP_TFTP_MODE_SERVER, &tftp);
-  }  
-
-  return ip; 
-}
-#endif
-#endif
-
-
-#ifdef HAS_PETIO
-static bool resprev = true;
-
-static bool repeating_timer_callback(struct repeating_timer *t) 
-{
-  bool resnext = gpio_get(CONFIG_PIN_PETBUS_RESET) != 0;
-  // REST was high and becomes low
-  if ( (resprev == true) && (!resnext) )
-  {
-    resprev = false;
-    pet_reset = true;
-  }
-  else {
-    resprev = resnext;
-  }
-  return true;
-}
-#endif
-
-
-#ifndef HAS_PETIO
-// ****************************************
-// USB keyboard
-// ****************************************
-void kbd_raw_key_down (int code, int flags)
-{
-  switch (code)
-  {
-    case KBD_KEY_UP:
-      break;
-    case KBD_KEY_DOWN:
-      break;
-    default:
-      char c = kbd_to_ascii (code, flags);
-      break;
-  }
-}
 #endif
 
 // ****************************************
@@ -1866,15 +1335,19 @@ int main()
 #endif
 
 #ifdef HAS_PETIO
-  init_petpio();  
+  petbus_init(pet_mem_write);  
 #else 
 #ifdef HAS_NETWORK 
-  init_server();
+  uint32_t ip = wifi_init();
+  if (ip)
+  {
+    tftp_init_common(LWIP_TFTP_MODE_SERVER, &tftp);
+  }   
 #endif
 #endif
 
   playSID.begin();
-  AudioInit(256, SND_Process);
+  pwm_audio_init(1024, audio_fill_buffer);
 
   memset((void*)&Bitmap[0],0, sizeof(Bitmap));
 
@@ -1888,6 +1361,7 @@ int main()
 #else
   pet_start();
 #endif
+
 
   // main loop
   while (true)
@@ -1970,8 +1444,8 @@ int main()
     xscrollslowdown&=7;
 
     //sleep_ms(500);
-    sid_dump();    
-    
+    sid_dump();        
+    pwm_audio_handle_buffer();
     handleCmdQueue();
 
 /*

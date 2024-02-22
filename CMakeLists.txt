@@ -17,8 +17,10 @@ pico_sdk_init()
 
 include_directories(.)
 include_directories(_vga)
+include_directories(_audio)
 include_directories(_sid)
 include_directories(_petemu)
+include_directories(_petbus)
 include_directories(_network)
 include_directories(_usb_kbd)
 include_directories(_pucrunch)
@@ -35,9 +37,28 @@ set(MAIN_SOURCES
 		main.cpp
 	)
 
+set(PICOVGA_SOURCES
+		_vga/vga.cpp
+		_vga/vga_vmode.cpp
+		_vga/vga_tile8.S
+		_vga/vga_tile16.S
+		_vga/vga_text8.S
+		_vga/vga_sprite16.S
+		_vga/vga_color.S
+		_vga/util/overclock.cpp
+	)
+
+set(AUDIO_SOURCES
+		_audio/pwm_audio.cpp
+	)
+
 set(SID_SOURCES 
 		_sid/sid.cpp
 		_sid/reSID.cpp	
+	)
+
+set(PETBUS_SOURCES 
+		_petbus/petbus.cpp		
 	)
 
 set(PETEMU_SOURCES 
@@ -46,6 +67,7 @@ set(PETEMU_SOURCES
 
 if( ${TARGET} MATCHES "hyperpetpicoemuwifi" )
 set(NETWORK_SOURCES 	
+		_network/network.cpp
 		_network/dhcpserver.c
 	)
 endif()
@@ -62,28 +84,20 @@ set(PUCRUNCH_SOURCES
 		_pucrunch/decrunch.c
 	)
 
-set(PICOVGA_SOURCES
-		_vga/vga.cpp
-		_vga/vga_vmode.cpp
-		_vga/vga_tile8.S
-		_vga/vga_tile16.S
-		_vga/vga_text8.S
-		_vga/vga_sprite16.S
-		_vga/vga_color.S
-		_vga/util/overclock.cpp
-	)
 
 add_executable(${TARGET}
 		${MAIN_SOURCES}
+		${PICOVGA_SOURCES}
+		${AUDIO_SOURCES}
 		${SID_SOURCES}
 		${PETEMU_SOURCES}
+		${PETBUS_SOURCES}
 		${PUCRUNCH_SOURCES}		
-		${PICOVGA_SOURCES}
 		${NETWORK_SOURCES}
 		${USB_SOURCES}
 	)
 
-pico_generate_pio_header(${TARGET} ${CMAKE_CURRENT_LIST_DIR}/petbus.pio)
+pico_generate_pio_header(${TARGET} ${CMAKE_CURRENT_LIST_DIR}/_petbus/petbus.pio)
 pico_generate_pio_header(${TARGET} ${CMAKE_CURRENT_LIST_DIR}/_vga/vga.pio)
 
 target_link_libraries(${TARGET} 
