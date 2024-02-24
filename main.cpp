@@ -1149,14 +1149,8 @@ void kbd_raw_key_down (int code, int flags)
 #endif
 
 #ifdef HAS_PETIO
-static bool repeating_timer_callback(struct repeating_timer *t) 
-{
-  pet_reset = petbus_poll_reset();
-  return true;
-}
-
-static void pet_mem_write(uint16_t address, uint8_t value)
-{
+static void __not_in_flash("pet_mem_write") pet_mem_write(uint16_t address, uint8_t value) {
+//static void pet_mem_write(uint16_t address, uint8_t value) {
   if (address == 0xe84C) 
   {
       // e84C 12=LO, 14=HI
@@ -1322,12 +1316,9 @@ static const struct tftp_context tftp = {
 
 int main()
 {
-#ifdef HAS_PETIO
-  struct repeating_timer timer;
-#endif
+#ifndef HAS_PETIO
   uint8_t xscrollslowdown=0;
-  int vidchange_cnt = VID_CNT;
-  uint8_t vid_mode = 0;
+#endif
 
   stdio_init_all();
 #ifndef HAS_PETIO
@@ -1346,7 +1337,7 @@ int main()
 #endif
 #endif
 
-  playSID.begin();
+  playSID.begin(SOUNDRATE);
   pwm_audio_init(1024, audio_fill_buffer);
 
   memset((void*)&Bitmap[0],0, sizeof(Bitmap));
@@ -1356,29 +1347,29 @@ int main()
 
   VideoRenderInit();
 
-#ifdef HAS_PETIO
-  add_repeating_timer_ms(1, repeating_timer_callback, NULL, &timer); 
-#else
+#ifndef HAS_PETIO
   pet_start();
 #endif
-
 
   // main loop
   while (true)
   {
+#ifdef HAS_PETIO  
+    if (petbus_poll_reset())
+    {
+#else      
     if (pet_reset)
     {
       pet_reset = false;
-#ifndef HAS_PETIO 
       mos.Reset();
       pet_running = true;
-#endif      
+#endif
       VideoRenderInit();
+      pwm_audio_reset();
     }
 
-    WaitVSync();
-
 #ifndef HAS_PETIO  
+    WaitVSync();
     if (pet_running)
     {
       pet_step();
@@ -1439,9 +1430,10 @@ int main()
         }                 
       }  
     }
-#endif
     xscrollslowdown+=1;
     xscrollslowdown&=7;
+    usb_kbd_scan();  
+#endif
 
     //sleep_ms(500);
     sid_dump();        
@@ -1470,9 +1462,6 @@ int main()
       }
     }
 */
-#ifndef HAS_PETIO
-    usb_kbd_scan();  
-#endif
   }
 }
 

@@ -10,6 +10,7 @@
 #define SIXTYHZ         1     // 60Hz mode
 #define EIGHTYCOL       1     // 80 column mode
 #define WIFI_AP         1     // WIFI as access point (preferred!)
+//#define AUDIO_IRQ       1     // handle audio with IRQ
 //#define RETROVGA        1
 #ifdef RETROVGA 
 #define AUDIO_PIN       9

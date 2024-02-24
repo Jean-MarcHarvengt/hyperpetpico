@@ -27,15 +27,14 @@
 #include "reSID.h"
 #include <math.h>
 
-#define AUDIO_BLOCK_SAMPLES 525// 443
-#define SAMPLERATE 31500 //22050
+#define AUDIO_BLOCK_SAMPLES (samplerate/60) //443 //525// 443
 #define CLOCKFREQ 985248
 
-void AudioPlaySID::begin(void)
+void AudioPlaySID::begin(float samplerate)
 {
 	sidptr = &sid;
 	this->reset();
-	setSampleParameters(CLOCKFREQ, SAMPLERATE);
+	setSampleParameters(CLOCKFREQ, samplerate);
 	playing = true;
 }
 

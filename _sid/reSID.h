@@ -34,8 +34,8 @@
 class AudioPlaySID
 {
 public:
-	AudioPlaySID(void) { begin(); }
-	void begin(void);
+	AudioPlaySID(void) {  }
+	void begin(float samplerate);
 	void setSampleParameters(float clockfreq, float samplerate);
 	inline void setreg(int ofs, int val) { sid.write(ofs, val); }
 	inline uint8_t getreg(int ofs) { return sid.read(ofs); }

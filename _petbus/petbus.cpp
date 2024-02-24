@@ -12,25 +12,37 @@
 const PIO pio = pio1;
 const uint sm = 0;
 static void (*mem_write)(uint16_t address, uint8_t value) = nullptr;
-static bool reset_prev = true;
+static bool prev_reset_state = true;
+static bool got_reset = false;
 
 /********************************
  * petio PIO IRQ
 ********************************/ 
-static void rx_irq(void) {
-  while(!pio_sm_is_rx_fifo_empty(pio, sm)) {
-    uint32_t value = pio_sm_get(pio, sm);
-    const bool is_write = ((value & (1u << (CONFIG_PIN_PETBUS_RW - CONFIG_PIN_PETBUS_DATA_BASE))) == 0);
-    uint_fast16_t address = (value >> 9) & 0xffff;
-    if ( (is_write) && (gpio_get(CONFIG_PIN_PETBUS_RESET)) )
+static void __not_in_flash("rx_irq") rx_irq(void) {
+//static void rx_irq(void) {
+  if(!pio_sm_is_rx_fifo_empty(pio, sm)) 
+  {
+    bool reset_state = !gpio_get(CONFIG_PIN_PETBUS_RESET);
+    if (!reset_state) 
     {
-      if ( address >= 0x8000) 
+      uint32_t value = pio_sm_get(pio, sm);
+      const bool is_write = ((value & (1u << (CONFIG_PIN_PETBUS_RW - CONFIG_PIN_PETBUS_DATA_BASE))) == 0);
+      uint16_t address = (value >> 9) & 0xffff;      
+      if (is_write)
       {
-        mem_write(address, value &= 0xff);
+        if ( address >= 0x8000) 
+        {
+          mem_write(address, value &= 0xff);
+        }
       }
-    }  
+      if (prev_reset_state) {
+        got_reset = true;
+      }
+    }
+    prev_reset_state = reset_state;
   }
 }
+
 
 /********************************
  * Initialization
@@ -76,6 +88,7 @@ void petbus_init(void (*mem_write_callback)(uint16_t address, uint8_t value))
       gpio_set_pulls(pin, false, false);
   }
 
+
   // Find a free irq
   static int8_t pio_irq;
   static_assert(PIO0_IRQ_1 == PIO0_IRQ_0 + 1 && PIO1_IRQ_1 == PIO1_IRQ_0 + 1, "");
@@ -88,13 +101,12 @@ void petbus_init(void (*mem_write_callback)(uint16_t address, uint8_t value))
   }
 
   // Enable interrupt
-  irq_add_shared_handler(pio_irq, rx_irq, PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY); // Add a shared IRQ handler
+  irq_add_shared_handler(pio_irq, rx_irq, 1); // Add a shared IRQ handler
   irq_set_enabled(pio_irq, true); // Enable the IRQ
   const uint irq_index = pio_irq - ((pio == pio0) ? PIO0_IRQ_0 : PIO1_IRQ_0); // Get index of the IRQ
   pio_set_irqn_source_enabled(pio, irq_index, (pio_interrupt_source)(pis_sm0_rx_fifo_not_empty + sm), true); // Set pio to tell us when the FIFO is NOT empty
-
   pio_sm_set_enabled(pio, sm, true);
-  pio_enable_sm_mask_in_sync(pio, (1 << sm));  
+  //pio_enable_sm_mask_in_sync(pio, (1 << sm)); 
 }
 
 
@@ -103,17 +115,9 @@ void petbus_init(void (*mem_write_callback)(uint16_t address, uint8_t value))
 ********************************/ 
 extern bool petbus_poll_reset(void)
 {  
-  bool reset_next = gpio_get(CONFIG_PIN_PETBUS_RESET) != 0;
-  // REST was high and becomes low
-  if ( (reset_prev == true) && (!reset_next) )
-  {
-    reset_prev = false;
-    return true;
-  }
-  else {
-    reset_prev = reset_next;
-  }
-  return false;
+  bool reset = got_reset;
+  got_reset = false;
+  return got_reset;
 }
 
 #endif
