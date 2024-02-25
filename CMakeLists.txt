@@ -132,7 +132,7 @@ target_include_directories(${TARGET} PRIVATE ${CMAKE_CURRENT_LIST_DIR} )
 #	PICO_CORE1_STACK_SIZE=0x200	
 #	)
 
-pico_enable_stdio_uart(${TARGET} TRUE)
+#pico_enable_stdio_uart(${TARGET} TRUE)
 #pico_enable_stdio_usb(${TARGET} TRUE)
 #suppress_pico_sdk_warnings()
 
