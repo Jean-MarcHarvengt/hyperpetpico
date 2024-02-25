@@ -115,6 +115,14 @@ void petbus_init(void (*mem_write_callback)(uint16_t address, uint8_t value))
 ********************************/ 
 extern bool petbus_poll_reset(void)
 {  
+  bool reset_state = !gpio_get(CONFIG_PIN_PETBUS_RESET);
+  if (!reset_state) 
+  {
+    if (prev_reset_state) {
+      got_reset = true;
+    }
+  }
+  prev_reset_state = reset_state;
   bool reset = got_reset;
   got_reset = false;
   return got_reset;

@@ -21,11 +21,13 @@
 #include "lwip/apps/tftp_server.h"
 #include "network.h"
 #endif
-#include "usb_kbd.h"
+#include "bsp/board.h"
+#include "tusb.h"
 #include "kbd.h"
+extern "C" void cdc_task(void);
+extern "C" void hid_app_task(void);
 #endif
 #include "decrunch.h"
-
 
 // Graphics
 #define VGA_RGB(r,g,b)   ( (((r>>5)&0x07)<<5) | (((g>>5)&0x07)<<2) | (((b>>6)&0x3)<<0) )
@@ -174,9 +176,6 @@ static void sid_dump( void )
 // ****************************************
 static void VgaCoreWithSound()
 {
-  //multicore_fifo_clear_irq();
-  //irq_set_exclusive_handler(SIO_IRQ_PROC1,core1_sio_irq);
-  //irq_set_enabled(SIO_IRQ_PROC1,true);
   VgaCore();
 }
 
@@ -185,7 +184,6 @@ static void ResetGFXMem(void)
   memset((void*)&Bitmap[0],0, sizeof(Bitmap));
   memset((void*)&TileData[0],0, sizeof(TileData));
   memset((void*)&SpriteData[0],0, sizeof(SpriteData));
-  //sleep_ms(10);
 }
 
 static void VideoInit(u8 mode, bool firstTime)
@@ -1132,18 +1130,34 @@ static void pet_kup(uint8_t asciicode) {
 // ****************************************
 // USB keyboard
 // ****************************************
-void kbd_raw_key_down (int code, int flags)
+char kbd_to_ascii (int code, int flags)
 {
-  switch (code)
+  // TODO -- I'm not sure how we handle 8-bit key codes, if there 
+  //   are any. I'm sure some keyboards must generate them (or, at least,
+  //   there scancode-to-keycode mappings do. At present, we only
+  //   support US keyboards. Virtual keys like 'up' and 'F1' also
+  //   generate codes > 127, and these also cannot meaningfully be
+  //   converted.
+  if (code > 127) return 0;
+  
+  // We have more work to do here. What about shift-ctrl, shift-alt, etc?
+  if (flags & KBD_FLAG_CONTROL)
+     return (code & ~0x60);
+
+  return code; 
+}
+
+void kbd_signal_raw_key (int code, int flags, int pressed)
+{
+  if (pressed == KEY_PRESSED)
   {
-    case KBD_KEY_UP:
-      pet_kup(kbd_to_ascii (code, flags));
-      break;
-    case KBD_KEY_DOWN:
-      pet_kdown(kbd_to_ascii (code, flags));
-      break;
-    default:
-      break;
+      pet_kdown(toupper(kbd_to_ascii (code, flags)));
+      //printf("kdown %c\r\n", kbd_to_ascii (code, flags));
+  }
+  else 
+  {
+      pet_kup(toupper(kbd_to_ascii (code, flags)));
+      //printf("kup %c\r\n", kbd_to_ascii (code, flags));
   }
 }
 #endif
@@ -1309,6 +1323,8 @@ static const struct tftp_context tftp = {
 #endif
 #endif
 
+
+
 // ****************************************
 // Main
 // ****************************************
@@ -1317,37 +1333,45 @@ static const struct tftp_context tftp = {
 int main()
 {
 #ifndef HAS_PETIO
-  uint8_t xscrollslowdown=0;
+  uint8_t slowdown=0;
 #endif
 
   stdio_init_all();
-#ifndef HAS_PETIO
-  usb_kbd_init();
-#endif
 
 #ifdef HAS_PETIO
   petbus_init(pet_mem_write);  
-#else 
+#else
 #ifdef HAS_NETWORK 
+  printf("Init Wifi...\n");
   uint32_t ip = wifi_init();
   if (ip)
   {
     tftp_init_common(LWIP_TFTP_MODE_SERVER, &tftp);
   }   
 #endif
+  printf("Init USB...\n");
+  
+  board_init();
+  printf("TinyUSB Host HID Controller Example\r\n");
+  printf("Note: Events only displayed for explicit supported controllers\r\n");
+  // init host stack on configured roothub port
+  tuh_init(BOARD_TUH_RHPORT);
 #endif
 
+  printf("Init Audio...\n");
   playSID.begin(SOUNDRATE);
   pwm_audio_init(1024, audio_fill_buffer);
 
   memset((void*)&Bitmap[0],0, sizeof(Bitmap));
 
+  printf("Init Video...\n");
   multicore_launch_core1(VgaCoreWithSound);  
   VideoSetup();
-
+  //screen_width = 640;
   VideoRenderInit();
 
 #ifndef HAS_PETIO
+  printf("Init Emu...\n");
   pet_start();
 #endif
 
@@ -1357,7 +1381,7 @@ int main()
 #ifdef HAS_PETIO  
     if (petbus_poll_reset())
     {
-#else      
+#else
     if (pet_reset)
     {
       pet_reset = false;
@@ -1369,6 +1393,17 @@ int main()
     }
 
 #ifndef HAS_PETIO  
+    // tinyusb host task
+    tuh_task();
+
+#if CFG_TUH_CDC
+    cdc_task();
+#endif
+
+#if CFG_TUH_HID
+    hid_app_task();
+#endif
+    
     WaitVSync();
     if (pet_running)
     {
@@ -1381,7 +1416,7 @@ int main()
         }  
         else 
         {
-          if (xscrollslowdown == 0)
+          if (slowdown == 0)
           {
             input_chr = input_cmd[input_pt] & 0x7f;
             if (input_chr != 0) 
@@ -1390,7 +1425,7 @@ int main()
               //printf("d %d\n", input_chr);
             }  
           }
-          else if (xscrollslowdown == 2)
+          else if (slowdown == 2)
           {
             if (input_chr != 0) 
             {
@@ -1412,14 +1447,14 @@ int main()
         else
         */  
         {
-          if (xscrollslowdown == 0)
+          if (slowdown == 0)
           {
             if (input_chr != 0) 
             {
               pet_kdown( input_chr);
             }  
           }
-          else if (xscrollslowdown == 2)
+          else if (slowdown == 2)
           {
             if (input_chr != 0) 
             {
@@ -1430,16 +1465,14 @@ int main()
         }                 
       }  
     }
-    xscrollslowdown+=1;
-    xscrollslowdown&=7;
-    usb_kbd_scan();  
+    slowdown+=1;
+    slowdown&=7;
 #endif
-
-    //sleep_ms(500);
     sid_dump();        
     pwm_audio_handle_buffer();
     handleCmdQueue();
-
+  }
+  {
 /*
     mem[REG_SPRITE_XLO] += 1;
 
@@ -1449,12 +1482,9 @@ int main()
       if (scroll++ == screen_width) scroll = 0;
       SET_XSCROLL_L0(scroll);      
     }
-*/
-
-/*
     if ( LAYER_L1_ENA )
     {
-      if (xscrollslowdown == 0) 
+      if (slowdown == 0) 
       {
         uint16_t scroll = GET_XSCROLL_L1;
         if (scroll++ == screen_width) scroll = 0;
