@@ -22,8 +22,6 @@
 
 #include "siddefs.h"
 
-RESID_NAMESPACE_START
-
 // ----------------------------------------------------------------------------
 // A 24 bit accumulator is the basis for waveform generation. FREQ is added to
 // the lower 16 bits of the accumulator each cycle.
@@ -32,13 +30,13 @@ RESID_NAMESPACE_START
 // The noise waveform is taken from intermediate bits of a 23 bit shift
 // register. This register is clocked by bit 19 of the accumulator.
 // ----------------------------------------------------------------------------
-class WaveformGenerator
+class RESID_API WaveformGenerator
 {
 public:
   WaveformGenerator();
 
   void set_sync_source(WaveformGenerator*);
-  //void set_chip_model(chip_model model);
+  void set_chip_model(chip_model model);
 
   RESID_INLINE void clock();
   RESID_INLINE void clock(cycle_count delta_t);
@@ -99,7 +97,7 @@ protected:
   RESID_INLINE reg12 outputNPST();
 
   // Sample data for combinations of waveforms.
-	/*
+  /*
   static reg8 wave6581__ST[];
   static reg8 wave6581_P_T[];
   static reg8 wave6581_PS_[];
@@ -115,12 +113,11 @@ protected:
   reg8* wave_PS_;
   reg8* wave_PST;
 */
-
   const reg8* wave__ST;
   const reg8* wave_P_T;
   const reg8* wave_PS_;
   const reg8* wave_PST;
-
+    
 friend class Voice;
 friend class SID;
 };
@@ -267,7 +264,7 @@ reg12 WaveformGenerator::output___T()
 {
   reg24 msb = (ring_mod ? accumulator ^ sync_source->accumulator : accumulator)
     & 0x800000;
-  return ((msb ? ~accumulator : accumulator) >> 11) & 0xffe;
+  return ((msb ? ~accumulator : accumulator) >> 11) & 0xfff;
 }
 
 // Sawtooth:
@@ -508,7 +505,5 @@ reg12 WaveformGenerator::output()
 }
 
 #endif // RESID_INLINING || defined(__WAVE_CC__)
-
-RESID_NAMESPACE_STOP
 
 #endif // not __WAVE_H__

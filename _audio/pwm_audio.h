@@ -4,7 +4,7 @@
 #include "global.h"
 
 #ifdef AUDIO_IRQ
-#define SOUNDRATE 22050                           // sound rate [Hz]
+#define SOUNDRATE 31500 //22050                           // sound rate [Hz]
 #else
 #define SOUNDRATE 31500                           // sound rate [Hz]
 #endif
@@ -14,7 +14,7 @@
 #define PWMSND_SLICE  ((PWMSND_GPIO>>1)&7)        // PWM slice index (=1)
 #define PWMSND_CHAN (PWMSND_GPIO&1)               // PWM channel index (=1)
 
-extern void pwm_audio_init(int buffersize, void (*callback)(short * stream, int len));
+extern void pwm_audio_init(int buffersize, void (*callback)(uint8_t * stream, int len));
 extern void pwm_audio_handle_sample(void);
 extern void pwm_audio_handle_buffer(void);
 extern void pwm_audio_reset(void);

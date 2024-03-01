@@ -125,7 +125,7 @@ extern bool petbus_poll_reset(void)
   prev_reset_state = reset_state;
   bool reset = got_reset;
   got_reset = false;
-  return got_reset;
+  return reset;
 }
 
 #endif

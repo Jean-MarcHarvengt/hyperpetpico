@@ -11,7 +11,7 @@
 	GNU General Public License for more details.
 	You should have received a copy of the GNU General Public License
 	along with this library.  If not, see <http://www.gnu.org/licenses/>.
-
+	
 	Diese Bibliothek ist freie Software: Sie können es unter den Bedingungen
 	der GNU General Public License, wie von der Free Software Foundation,
 	Version 3 der Lizenz oder (nach Ihrer Wahl) jeder neueren
@@ -24,26 +24,35 @@
 	Programm erhalten haben. Wenn nicht, siehe <http://www.gnu.org/licenses/>.
 
  */
+#include "reSID.h"
+#include <math.h>
 
-#include "reSID/envelope.cpp"
-#include "reSID/extfilt.cpp"
-#include "reSID/filter.cpp"
-#include "reSID/pot.cpp"
-#include "reSID/version.cpp"
-#include "reSID/voice.cpp"
+#define CLOCKFREQ 985248
+
+void AudioPlaySID::begin(float samplerate, int blocksize)
+{
+	sidptr = &sid;
+	this->reset();
+	sid.set_sampling_parameters(CLOCKFREQ, SAMPLE_FAST, samplerate); 
+	csdelta = round((float)CLOCKFREQ / ((float)samplerate / blocksize));
+	playing = true;
+}
 
 
-#include "reSID/wave6581__ST.cpp" 
-#include "reSID/wave6581_P_T.cpp"
-#include "reSID/wave6581_PS_.cpp"
-#include "reSID/wave6581_PST.cpp"
+void AudioPlaySID::reset(void)
+{
+	sid.reset();
+}
 
-/*
-#include "reSID/wave8580__ST.cc" 
-#include "reSID/wave8580_P_T.cc"
-#include "reSID/wave8580_PS_.cc"
-#include "reSID/wave8580_PST.cc"
-*/
-#include "reSID/wave.cpp"
+void AudioPlaySID::stop(void)
+{
+	playing = false;	
+}
 
-#include "reSID/sid.cpp"
+void AudioPlaySID::update(float samplerate, void * stream, int len) {
+	// only update if we're playing
+	if (!playing) return;
+
+	cycle_count delta_t = csdelta;
+	sidptr->clock(delta_t, (short int*)stream, len);
+}

@@ -6,6 +6,7 @@
 #include "include.h"
 #include "petfont.h"
 #include "reSID.h"
+//#include "libcsid.h"
 
 #include "pwm_audio.h"
 #include "petbus.h"
@@ -145,30 +146,34 @@ static bool pet_reset = false;
 // Audio code
 // ****************************************
 static AudioPlaySID playSID;
+static u8 prev_sid_reg[26];
 
 void __not_in_flash("AudioRender") AudioRender(void)
 {
+#ifndef AUDIO_IRQ
   pwm_audio_handle_sample();
+#endif
 }
 
-static void audio_fill_buffer( short * stream, int len )
+static void audio_fill_buffer( uint8_t * stream, int len )
 {
-    playSID.update((void *)stream, len);
+  playSID.update(SOUNDRATE, (void *)stream, len);
+  //libcsid_render(&buffer[0], (unsigned short int*)stream, len); 
 }
 
-static char buffer[26];
-static char oldbuffer[26];
 
 static void sid_dump( void )
 {
+  //memcpy((void *)&buffer[0], (void *)&mem[REG_SID_BASE], 26);
   for(int i=0;i<25;i++) 
   {
-    buffer[i] = mem[REG_SID_BASE+i];
-    if(buffer[i] != oldbuffer[i]) {       
-        playSID.setreg(i, buffer[i]);
-        oldbuffer[i] = buffer[i];                  
+    u8 reg = mem[REG_SID_BASE+i];
+    if(reg != prev_sid_reg[i]) {       
+        playSID.setreg(i, reg);
+        prev_sid_reg[i] = reg;                  
     } 
   }
+ 
 }
 
 // ****************************************
@@ -563,8 +568,8 @@ static void VideoRenderInit(void)
   // 3: L0 bitmap  
 //  SET_LAYER_MODE( LAYER_L0_TILE | LAYER_L1_TILE | LAYER_L2_SPRITE );
 //  SET_LAYER_MODE( LAYER_L0_TILE | LAYER_L1_PETFONT | LAYER_L2_SPRITE );
-//  SET_LAYER_MODE( LAYER_L0_TILE | LAYER_L1_PETFONT | LAYER_L2_SPRITE | LAYER_L2_INBETW );
-  SET_LAYER_MODE( LAYER_L0_BITMAP | LAYER_L1_PETFONT | LAYER_L2_SPRITE );
+  SET_LAYER_MODE( LAYER_L0_TILE | LAYER_L1_PETFONT | LAYER_L2_SPRITE | LAYER_L2_INBETW );
+//  SET_LAYER_MODE( LAYER_L0_BITMAP | LAYER_L1_PETFONT | LAYER_L2_SPRITE );
 //  SET_LAYER_MODE( LAYER_L0_BITMAP | LAYER_L1_PETFONT | LAYER_L2_SPRITE | LAYER_L2_INBETW );
 //  SET_LAYER_MODE( LAYER_L0_TILE | LAYER_L1_PETFONT | LAYER_L0_AREA | LAYER_L1_AREA | LAYER_L2_SPRITE );
 //  SET_LAYER_MODE( LAYER_L1_PETFONT | LAYER_L1_AREA );
@@ -1358,17 +1363,23 @@ int main()
   tuh_init(BOARD_TUH_RHPORT);
 #endif
 
-  printf("Init Audio...\n");
-  playSID.begin(SOUNDRATE);
-  pwm_audio_init(1024, audio_fill_buffer);
-
   memset((void*)&Bitmap[0],0, sizeof(Bitmap));
 
+#ifndef HAS_PETIO
   printf("Init Video...\n");
+#endif
   multicore_launch_core1(VgaCoreWithSound);  
   VideoSetup();
   //screen_width = 640;
   VideoRenderInit();
+
+#ifndef HAS_PETIO
+  printf("Init Audio...\n");
+#endif
+  playSID.begin(SOUNDRATE, 800);
+  //libcsid_init(SOUNDRATE, SIDMODEL_6581);  
+  pwm_audio_init(1600, audio_fill_buffer);
+
 
 #ifndef HAS_PETIO
   printf("Init Emu...\n");
@@ -1392,6 +1403,15 @@ int main()
       pwm_audio_reset();
     }
 
+    WaitVSync();
+//    WaitScanline(50);
+//mem[REG_BG_COL] = 0xff;
+    sid_dump();
+    pwm_audio_handle_buffer();
+    //sleep_ms(3);
+//mem[REG_BG_COL] = 0x00;
+    handleCmdQueue();
+
 #ifndef HAS_PETIO  
     // tinyusb host task
     tuh_task();
@@ -1404,7 +1424,6 @@ int main()
     hid_app_task();
 #endif
     
-    WaitVSync();
     if (pet_running)
     {
       pet_step();
@@ -1468,11 +1487,6 @@ int main()
     slowdown+=1;
     slowdown&=7;
 #endif
-    sid_dump();        
-    pwm_audio_handle_buffer();
-    handleCmdQueue();
-  }
-  {
 /*
     mem[REG_SPRITE_XLO] += 1;
 

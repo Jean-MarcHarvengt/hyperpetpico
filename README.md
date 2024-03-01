@@ -75,5 +75,7 @@ Hyperpetpico reuse or is inspired from the code of below projects
 * Tftp server on Raspberry PICO from Damien P. George
 * [Pucrunch compressor for 6502 CPU](https://github.com/mist64/pucrunch)
 * [reSID emulator](https://en.wikipedia.org/wiki/ReSID)
+* [Teensy-reSID](https://github.com/FrankBoesing/Teensy-reSID)
+
 * [MOS6502](https://github.com/gianlucag/mos6502)
 

@@ -17,14 +17,15 @@
 //  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 //  ---------------------------------------------------------------------------
 
-#include "pot.h"
+#ifndef __POT_H__
+#define __POT_H__
 
-RESID_NAMESPACE_START
+#include "siddefs.h"
 
-reg8 Potentiometer::readPOT()
+class RESID_API Potentiometer
 {
-  // NB! Not modeled.
-  return 0xff;
-}
+public:
+  reg8 readPOT();
+};
 
-RESID_NAMESPACE_STOP
+#endif

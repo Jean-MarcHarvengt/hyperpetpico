@@ -22,8 +22,6 @@
 
 #include "siddefs.h"
 
-RESID_NAMESPACE_START
-
 // ----------------------------------------------------------------------------
 // The audio output stage in a Commodore 64 consists of two STC networks,
 // a low-pass filter with 3-dB frequency 16kHz followed by a high-pass
@@ -37,14 +35,13 @@ RESID_NAMESPACE_START
 // of kHz. This calls for a sampling frequency of several MHz, which is far
 // too high for practical use.
 // ----------------------------------------------------------------------------
-class ExternalFilter
+class RESID_API ExternalFilter
 {
 public:
   ExternalFilter();
 
   void enable_filter(bool enable);
-  void set_sampling_parameter(float pass_freq);
-  //void set_chip_model(chip_model model);
+  void set_chip_model(chip_model model);
 
   RESID_INLINE void clock(sound_sample Vi);
   RESID_INLINE void clock(cycle_count delta_t, sound_sample Vi);
@@ -163,7 +160,5 @@ sound_sample ExternalFilter::output()
 }
 
 #endif // RESID_INLINING || defined(__EXTFILT_CC__)
-
-RESID_NAMESPACE_STOP
 
 #endif // not __EXTFILT_H__

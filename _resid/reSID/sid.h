@@ -2,9 +2,9 @@
 //  This file is part of reSID, a MOS6581 SID emulator engine.
 //  Copyright (C) 2004  Dag Lem <resid@nimrod.no>
 //
-//  This program is free float; you can redistribute it and/or modify
+//  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
-//  the Free float Foundation; either version 2 of the License, or
+//  the Free Software Foundation; either version 2 of the License, or
 //  (at your option) any later version.
 //
 //  This program is distributed in the hope that it will be useful,
@@ -13,7 +13,7 @@
 //  GNU General Public License for more details.
 //
 //  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free float
+//  along with this program; if not, write to the Free Software
 //  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 //  ---------------------------------------------------------------------------
 
@@ -26,34 +26,31 @@
 #include "extfilt.h"
 #include "pot.h"
 
-RESID_NAMESPACE_START
-
-class SID
+class RESID_API SID
 {
 public:
   SID();
   ~SID();
-	//void printFilter(void);
-  //void set_chip_model(chip_model model);
+
+  void set_chip_model(chip_model model);
   void enable_filter(bool enable);
   void enable_external_filter(bool enable);
-  bool set_sampling_parameters(float clock_freq, sampling_method method,
-			       float sample_freq, float pass_freq = -1,
-			       float filter_scale = 0.97);
-  void adjust_sampling_frequency(float sample_freq);
+  bool set_sampling_parameters(double clock_freq, sampling_method method,
+			       double sample_freq, double pass_freq = -1,
+			       double filter_scale = 0.97);
+  void adjust_sampling_frequency(double sample_freq);
 
   //void fc_default(const fc_point*& points, int& count);
   //PointPlotter<sound_sample> fc_plotter();
 
   void clock();
   void clock(cycle_count delta_t);
-  int clock(cycle_count& delta_t, short* buf, int n);
+  int clock(cycle_count& delta_t, short* buf, int n, int interleave = 1);
   void reset();
   
   // Read/write registers.
   reg8 read(reg8 offset);
   void write(reg8 offset, reg8 value);
-  void mute(reg8 channel, bool enable);
 
   // Read/write state.
   class State
@@ -85,14 +82,21 @@ public:
 
   // 16-bit output (AUDIO OUT).
   int output();
-
+  // n-bit output.
+  int output(int bits);
 
 protected:
+  static double I0(double x);
+  RESID_INLINE int clock_fast(cycle_count& delta_t, short* buf, int n,
+			      int interleave);
+  RESID_INLINE int clock_interpolate(cycle_count& delta_t, short* buf, int n,
+				     int interleave);
+  RESID_INLINE int clock_resample_interpolate(cycle_count& delta_t, short* buf,
+					      int n, int interleave);
+  RESID_INLINE int clock_resample_fast(cycle_count& delta_t, short* buf,
+				       int n, int interleave);
 
-  RESID_INLINE int clock_fast(cycle_count& delta_t, short* buf, int n);
-  RESID_INLINE int clock_interpolate(cycle_count& delta_t, short* buf, int n);
-
-	Voice voice[3];
+  Voice voice[3];
   Filter filter;
   ExternalFilter extfilt;
   Potentiometer potx;
@@ -101,21 +105,27 @@ protected:
   reg8 bus_value;
   cycle_count bus_value_ttl;
 
-  float clock_frequency;
+  double clock_frequency;
 
   // External audio input.
   int ext_in;
 
   // Resampling constants.
-  static const int FIR_N;
-  static const int FIR_RES_INTERPOLATE;
-  static const int FIR_RES_FAST;
-  static const int FIR_SHIFT;
-  static const int RINGSIZE;
+  // The error in interpolated lookup is bounded by 1.234/L^2,
+  // while the error in non-interpolated lookup is bounded by
+  // 0.7854/L + 0.4113/L^2, see
+  // http://www-ccrma.stanford.edu/~jos/resample/Choice_Table_Size.html
+  // For a resolution of 16 bits this yields L >= 285 and L >= 51473,
+  // respectively.
+  static const int FIR_N = 125;
+  static const int FIR_RES_INTERPOLATE = 285;
+  static const int FIR_RES_FAST = 51473;
+  static const int FIR_SHIFT = 15;
+  static const int RINGSIZE = 16384;
 
-  // Fixpoint constants.
-  static const int FIXP_SHIFT;
-  static const int FIXP_MASK;
+  // Fixpoint constants (16.16 bits).
+  static const int FIXP_SHIFT = 16;
+  static const int FIXP_MASK = 0xffff;
 
   // Sampling variables.
   sampling_method sampling;
@@ -126,8 +136,11 @@ protected:
   int fir_N;
   int fir_RES;
 
-};
+  // Ring buffer with overflow for contiguous storage of RINGSIZE samples.
+  short* sample;
 
-RESID_NAMESPACE_STOP
+  // FIR_RES filter tables (FIR_N*FIR_RES).
+  short* fir;
+};
 
 #endif // not __SID_H__

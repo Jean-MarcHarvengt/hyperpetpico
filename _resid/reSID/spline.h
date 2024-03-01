@@ -20,8 +20,6 @@
 #ifndef __SPLINE_H__
 #define __SPLINE_H__
 
-RESID_NAMESPACE_START
-
 // Our objective is to construct a smooth interpolating single-valued function
 // y = f(x).
 //
@@ -248,14 +246,14 @@ void interpolate(PointIter p0, PointIter pn, PointPlotter plot, double res)
 // ----------------------------------------------------------------------------
 // Class for plotting integers into an array.
 // ----------------------------------------------------------------------------
-template<class FN>
+template<class F>
 class PointPlotter
 {
  protected:
-  FN* f;
+  F* f;
 
  public:
-  PointPlotter(FN* arr) : f(arr)
+  PointPlotter(F* arr) : f(arr)
   {
   }
 
@@ -266,10 +264,9 @@ class PointPlotter
       y = 0;
     }
 
-    f[FN(x)] = FN(y);
+    f[F(x)] = F(y);
   }
 };
 
-RESID_NAMESPACE_STOP
 
 #endif // not __SPLINE_H__

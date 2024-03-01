@@ -24,8 +24,6 @@
 //#include "spline.h"
 #include "filter6581.h"
 
-RESID_NAMESPACE_START
-
 // ----------------------------------------------------------------------------
 // The SID filter is modeled with a two-integrator-loop biquadratic filter,
 // which has been confirmed by Bob Yannes to be the actual circuit used in
@@ -121,13 +119,13 @@ RESID_NAMESPACE_START
 //          Vw
 //
 // ----------------------------------------------------------------------------
-class Filter
+class RESID_API Filter
 {
 public:
   Filter();
 
   void enable_filter(bool enable);
- // void set_chip_model(chip_model model);
+  void set_chip_model(chip_model model);
 
   RESID_INLINE
   void clock(sound_sample voice1, sound_sample voice2, sound_sample voice3,
@@ -148,8 +146,8 @@ public:
   sound_sample output();
 
   // Spline functions.
- // void fc_default(const fc_point*& points, int& count);
- // PointPlotter<sound_sample> fc_plotter();
+  //void fc_default(const fc_point*& points, int& count);
+  //PointPlotter<sound_sample> fc_plotter();
 
 protected:
   void set_w0();
@@ -194,12 +192,10 @@ protected:
   //sound_sample f0_6581[2048];
   //sound_sample f0_8580[2048];
   //sound_sample* f0;
-	//const sound_sample* f0 = filter6581;
-	const short* f0 = filter6581;
-  //const static fc_point f0_points_6581[];
-		
-  //const static fc_point f0_points_8580[];
-  //const fc_point* f0_points;
+  const short* f0 = filter6581;
+  //static fc_point f0_points_6581[];
+  //static fc_point f0_points_8580[];
+  //fc_point* f0_points;
   //int f0_count;
 
 friend class SID;
@@ -464,7 +460,7 @@ void Filter::clock(cycle_count delta_t,
     // Vhp = Vbp/Q - Vlp - Vi;
     // dVbp = -w0*Vhp*dt;
     // dVlp = -w0*Vbp*dt;
-    sound_sample w0_delta_t = w0_ceil_dt * delta_t_flt >> 6;
+    sound_sample w0_delta_t = w0_ceil_dt*delta_t_flt >> 6;
 
     sound_sample dVbp = (w0_delta_t*Vhp >> 14);
     sound_sample dVlp = (w0_delta_t*Vbp >> 14);
@@ -533,7 +529,5 @@ sound_sample Filter::output()
 }
 
 #endif // RESID_INLINING || defined(__FILTER_CC__)
-
-RESID_NAMESPACE_STOP
 
 #endif // not __FILTER_H__

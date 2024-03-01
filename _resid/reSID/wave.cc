@@ -20,8 +20,6 @@
 #define __WAVE_CC__
 #include "wave.h"
 
-RESID_NAMESPACE_START
-
 // ----------------------------------------------------------------------------
 // Constructor.
 // ----------------------------------------------------------------------------
@@ -31,7 +29,7 @@ WaveformGenerator::WaveformGenerator()
 
  // set_chip_model(MOS6581);
  {//instead:
-	wave__ST = &wave6581__ST[0];
+  wave__ST = &wave6581__ST[0];
   wave_P_T = &wave6581_P_T[0];
   wave_PS_ = &wave6581_PS_[0];
   wave_PST = &wave6581_PST[0];
@@ -57,16 +55,16 @@ void WaveformGenerator::set_sync_source(WaveformGenerator* source)
 void WaveformGenerator::set_chip_model(chip_model model)
 {
   if (model == MOS6581) {
-    wave__ST = &wave6581__ST[0];
-    wave_P_T = &wave6581_P_T[0];
-    wave_PS_ = &wave6581_PS_[0];
-    wave_PST = &wave6581_PST[0];
-  } 
+    wave__ST = wave6581__ST;
+    wave_P_T = wave6581_P_T;
+    wave_PS_ = wave6581_PS_;
+    wave_PST = wave6581_PST;
+  }
   else {
-    wave__ST = &wave8580__ST[0];
-    wave_P_T = &wave8580_P_T[0];
-    wave_PS_ = &wave8580_PS_[0];
-    wave_PST = &wave8580_PST[0];
+    wave__ST = wave8580__ST;
+    wave_P_T = wave8580_P_T;
+    wave_PS_ = wave8580_PS_;
+    wave_PST = wave8580_PST;
   }
 }
 */
@@ -81,7 +79,7 @@ void WaveformGenerator::writeFREQ_LO(reg8 freq_lo)
 
 void WaveformGenerator::writeFREQ_HI(reg8 freq_hi)
 {
-  freq = (((unsigned int) freq_hi << 8) & 0xff00) | (freq & 0x00ff);
+  freq = ((freq_hi << 8) & 0xff00) | (freq & 0x00ff);
 }
 
 void WaveformGenerator::writePW_LO(reg8 pw_lo)
@@ -91,7 +89,7 @@ void WaveformGenerator::writePW_LO(reg8 pw_lo)
 
 void WaveformGenerator::writePW_HI(reg8 pw_hi)
 {
-  pw = (((unsigned int)pw_hi << 8) & 0xf00) | (pw & 0x0ff);
+  pw = ((pw_hi << 8) & 0xf00) | (pw & 0x0ff);
 }
 
 void WaveformGenerator::writeCONTROL_REG(reg8 control)
@@ -150,5 +148,3 @@ void WaveformGenerator::reset()
 
   msb_rising = false;
 }
-
-RESID_NAMESPACE_STOP

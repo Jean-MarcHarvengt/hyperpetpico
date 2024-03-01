@@ -24,17 +24,14 @@
 #include "wave.h"
 #include "envelope.h"
 
-RESID_NAMESPACE_START
-
-class Voice
+class RESID_API Voice
 {
 public:
   Voice();
 
-//  void set_chip_model(chip_model model);
+  void set_chip_model(chip_model model);
   void set_sync_source(Voice*);
   void reset();
-  void mute(bool enable);
 
   void writeCONTROL_REG(reg8);
 
@@ -45,7 +42,6 @@ public:
 protected:
   WaveformGenerator wave;
   EnvelopeGenerator envelope;
-  bool muted;
 
   // Waveform D/A zero level.
   sound_sample wave_zero;
@@ -72,16 +68,10 @@ friend class SID;
 RESID_INLINE
 sound_sample Voice::output()
 {
-  if (!muted)
-  { // Multiply oscillator output with envelope output.
-    return (wave.output() - wave_zero)*envelope.output() + voice_DC;
-  } else {
-    return 0;
-  }
+  // Multiply oscillator output with envelope output.
+  return (wave.output() - wave_zero)*envelope.output() + voice_DC;
 }
 
 #endif // RESID_INLINING || defined(__VOICE_CC__)
-
-RESID_NAMESPACE_STOP
 
 #endif // not __VOICE_H__

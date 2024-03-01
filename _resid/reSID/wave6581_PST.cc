@@ -19,8 +19,6 @@
 
 #include "wave.h"
 
-RESID_NAMESPACE_START
-
 //reg8 WaveformGenerator::wave6581_PST[] =
 const reg8 wave6581_PST[] =
 {
@@ -538,4 +536,3 @@ const reg8 wave6581_PST[] =
 /* 0xff8: */  0x00, 0x00, 0x00, 0x78, 0x78, 0x7e, 0x7f, 0x7f,
 };
 
-RESID_NAMESPACE_STOP

@@ -18,7 +18,7 @@ pico_sdk_init()
 include_directories(.)
 include_directories(_vga)
 include_directories(_audio)
-include_directories(_sid)
+include_directories(_resid)
 include_directories(_petemu)
 include_directories(_petbus)
 include_directories(_network)
@@ -53,8 +53,8 @@ set(AUDIO_SOURCES
 	)
 
 set(SID_SOURCES 
-		_sid/sid.cpp
-		_sid/reSID.cpp	
+		_resid/sid.cpp
+		_resid/reSID.cpp	
 	)
 
 set(PETBUS_SOURCES 

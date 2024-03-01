@@ -20,8 +20,6 @@
 #define __FILTER_CC__
 #include "filter.h"
 
-RESID_NAMESPACE_START
-
 // Maximum cutoff frequency is specified as
 // FCmax = 2.6e-5/C = 2.6e-5/2200e-12 = 11818.
 //
@@ -44,7 +42,7 @@ RESID_NAMESPACE_START
 // NB! Cutoff frequency characteristics may vary, we have modeled two
 // particular Commodore 64s.
 /*
-const fc_point Filter::f0_points_6581[] =
+fc_point Filter::f0_points_6581[] =
 {
   //  FC      f         FCHI FCLO
   // ----------------------------
@@ -80,9 +78,8 @@ const fc_point Filter::f0_points_6581[] =
   { 2047, 18000 },   // 0xff 0x07
   { 2047, 18000 }    // 0xff 0x07 - repeated end point
 };
-*/
-/*
-const fc_point Filter::f0_points_8580[] =
+
+fc_point Filter::f0_points_8580[] =
 {
   //  FC      f         FCHI FCLO
   // ----------------------------
@@ -132,27 +129,25 @@ Filter::Filter()
   Vnf = 0;
 
   enable_filter(true);
-/*	
+/*
   // Create mappings from FC to cutoff frequency.
   interpolate(f0_points_6581, f0_points_6581
 	      + sizeof(f0_points_6581)/sizeof(*f0_points_6581) - 1,
 	      PointPlotter<sound_sample>(f0_6581), 1.0);
-			
   interpolate(f0_points_8580, f0_points_8580
 	      + sizeof(f0_points_8580)/sizeof(*f0_points_8580) - 1,
 	      PointPlotter<sound_sample>(f0_8580), 1.0);
+  set_chip_model(MOS6581);
 */
-//  set_chip_model(MOS6581);
 {//instead:
-	    mixer_DC = -0xfff*0xff/18 >> 7;
+      mixer_DC = -0xfff*0xff/18 >> 7;
 
     //f0 = f0_6581;
-   // f0_points = f0_points_6581;		
+   // f0_points = f0_points_6581;   
    // f0_count = sizeof(f0_points_6581)/sizeof(*f0_points_6581);
-		set_w0();
+    set_w0();
     set_Q();
-}
-		
+}  
 }
 
 
@@ -202,7 +197,6 @@ void Filter::set_chip_model(chip_model model)
 }
 */
 
-
 // ----------------------------------------------------------------------------
 // SID reset.
 // ----------------------------------------------------------------------------
@@ -242,7 +236,7 @@ void Filter::writeFC_LO(reg8 fc_lo)
 
 void Filter::writeFC_HI(reg8 fc_hi)
 {
-  fc = (((unsigned int)fc_hi << 3) & 0x7f8) | (fc & 0x007);
+  fc = ((fc_hi << 3) & 0x7f8) | (fc & 0x007);
   set_w0();
 }
 
@@ -266,18 +260,18 @@ void Filter::writeMODE_VOL(reg8 mode_vol)
 // Set filter cutoff frequency.
 void Filter::set_w0()
 {
-  const float pi = 3.1415926535897932385;
+  const double pi = 3.1415926535897932385;
 
   // Multiply with 1.048576 to facilitate division by 1 000 000 by right-
   // shifting 20 times (2 ^ 20 = 1048576).
-  w0 = static_cast<sound_sample>(2.0*pi*f0[fc]*1.048576);
+  w0 = static_cast<sound_sample>(2*pi*f0[fc]*1.048576);
 
   // Limit f0 to 16kHz to keep 1 cycle filter stable.
-  const sound_sample w0_max_1 = static_cast<sound_sample>(2.0*pi*16000.0*1.048576);
+  const sound_sample w0_max_1 = static_cast<sound_sample>(2*pi*16000*1.048576);
   w0_ceil_1 = w0 <= w0_max_1 ? w0 : w0_max_1;
 
   // Limit f0 to 4kHz to keep delta_t cycle filter stable.
-  const sound_sample w0_max_dt = static_cast<sound_sample>(2.0*pi*4000.0*1.048576);
+  const sound_sample w0_max_dt = static_cast<sound_sample>(2*pi*4000*1.048576);
   w0_ceil_dt = w0 <= w0_max_dt ? w0 : w0_max_dt;
 }
 
@@ -290,7 +284,7 @@ void Filter::set_Q()
 
   // The coefficient 1024 is dispensed of later by right-shifting 10 times
   // (2 ^ 10 = 1024).
-  _1024_div_Q = static_cast<sound_sample>(1024.0/(0.707 + 1.0*res/15.0));
+  _1024_div_Q = static_cast<sound_sample>(1024.0/(0.707 + 1.0*res/0x0f));
 }
 
 // ----------------------------------------------------------------------------
@@ -308,6 +302,7 @@ void Filter::fc_default(const fc_point*& points, int& count)
   count = f0_count;
 }
 */
+
 // ----------------------------------------------------------------------------
 // Given an array of interpolation points p with n points, the following
 // statement will specify a new FC mapping:
@@ -322,4 +317,3 @@ PointPlotter<sound_sample> Filter::fc_plotter()
   return PointPlotter<sound_sample>(f0);
 }
 */
-RESID_NAMESPACE_STOP

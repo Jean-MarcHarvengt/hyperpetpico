@@ -555,7 +555,13 @@ void WaitVSync()
 	while (!VSync) { __dmb(); }
 }
 
+void WaitScanline(int scanline)
+{
+	while (ScanLine != scanline) { __dmb(); }
+}
+
 int GetScanline()
 {
 	return ScanLine;
 }
+

@@ -22,8 +22,6 @@
 
 #include "siddefs.h"
 
-RESID_NAMESPACE_START
-
 // ----------------------------------------------------------------------------
 // A 15 bit counter is used to implement the envelope rates, in effect
 // dividing the clock to the envelope counter by the currently selected rate
@@ -33,7 +31,7 @@ RESID_NAMESPACE_START
 // The period of this counter is set to 1, 2, 4, 8, 16, 30 at the envelope
 // counter values 255, 93, 54, 26, 14, 6, respectively.
 // ----------------------------------------------------------------------------
-class EnvelopeGenerator
+class RESID_API EnvelopeGenerator
 {
 public:
   EnvelopeGenerator();
@@ -303,7 +301,5 @@ reg8 EnvelopeGenerator::output()
 }
 
 #endif // RESID_INLINING || defined(__ENVELOPE_CC__)
-
-RESID_NAMESPACE_STOP
 
 #endif // not __ENVELOPE_H__

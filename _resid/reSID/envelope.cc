@@ -20,8 +20,6 @@
 #define __ENVELOPE_CC__
 #include "envelope.h"
 
-RESID_NAMESPACE_START
-
 // ----------------------------------------------------------------------------
 // Constructor.
 // ----------------------------------------------------------------------------
@@ -227,5 +225,3 @@ reg8 EnvelopeGenerator::readENV()
 {
   return output();
 }
-
-RESID_NAMESPACE_STOP

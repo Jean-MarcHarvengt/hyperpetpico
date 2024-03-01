@@ -35,16 +35,15 @@ class AudioPlaySID
 {
 public:
 	AudioPlaySID(void) {  }
-	void begin(float samplerate);
-	void setSampleParameters(float clockfreq, float samplerate);
+	void begin(float samplerate, int blocksize);
 	inline void setreg(int ofs, int val) { sid.write(ofs, val); }
 	inline uint8_t getreg(int ofs) { return sid.read(ofs); }
 	void reset(void);
 	void stop(void);
-	void update(void * stream, int len);	
+	void update(float samplerate, void * stream, int len);	
 	inline bool isPlaying(void) { return playing; }	
 private:
-	cycle_count csdelta;
+	cycle_count csdelta;	
 	volatile bool playing;
 	SID sid;
 	SID* sidptr;

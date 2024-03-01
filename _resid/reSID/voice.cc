@@ -20,19 +20,16 @@
 #define __VOICE_CC__
 #include "voice.h"
 
-RESID_NAMESPACE_START
-
 // ----------------------------------------------------------------------------
 // Constructor.
 // ----------------------------------------------------------------------------
 Voice::Voice()
-  : muted(false)
 {
-  //set_chip_model(MOS6581);
-	{//instead:
-	wave_zero = 0x380;
-	voice_DC = 0x800*0xff;
-	}
+//  set_chip_model(MOS6581);
+  {//instead:
+  wave_zero = 0x380;
+  voice_DC = 0x800*0xff;
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -138,15 +135,3 @@ void Voice::reset()
   wave.reset();
   envelope.reset();
 }
-
-
-// ----------------------------------------------------------------------------
-// Voice mute.
-// ----------------------------------------------------------------------------
-void Voice::mute(bool enable)
-{
-  // enable = true (means voice is muted)
-  muted = enable;
-}
-
-RESID_NAMESPACE_STOP

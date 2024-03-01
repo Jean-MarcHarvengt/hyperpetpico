@@ -99,6 +99,7 @@ void Core1Wait();
 
 // wait for VSync scanline
 void WaitVSync();
+void WaitScanline(int scanline);
 
 // get scanline
 int GetScanline();

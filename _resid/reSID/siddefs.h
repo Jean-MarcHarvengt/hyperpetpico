@@ -23,26 +23,6 @@
 // Define bool, true, and false for C++ compilers that lack these keywords.
 #define RESID_HAVE_BOOL 1
 
-// Inlining on/off.
-#define RESID_INLINING 1
-#define RESID_INLINE inline
-
-// Support namespace
-
-#ifdef RESID_NAMESPACE
-#   define RESID_NAMESPACE_START \
-    namespace RESID_NAMESPACE    \
-    {
-#   define RESID_NAMESPACE_STOP  \
-    }
-#else
-#   define RESID_NAMESPACE_START
-#   define RESID_NAMESPACE_STOP
-#endif
-
-
-RESID_NAMESPACE_START
-
 #if !RESID_HAVE_BOOL
 typedef int bool;
 const bool true = 1;
@@ -55,22 +35,21 @@ const bool false = 0;
 // cycle_count, and sound_sample). GNU does not support 16-bit machines
 // (GNU Coding Standards: Portability between CPUs), so this should be
 // a valid assumption.
-#include <stdint.h>
-#include <stdio.h>
 
-typedef uint16_t reg4;
-typedef uint16_t reg8;
-typedef uint16_t reg12;
-typedef uint16_t reg16;
+typedef unsigned int reg4;
+typedef unsigned int reg8;
+typedef unsigned int reg12;
+typedef unsigned int reg16;
 typedef unsigned int reg24;
 
 typedef int cycle_count;
 typedef int sound_sample;
 typedef sound_sample fc_point[2];
 
-//enum chip_model { MOS6581, MOS8580 };
+enum chip_model { MOS6581, MOS8580 };
 
-enum sampling_method { SAMPLE_FAST, SAMPLE_INTERPOLATE};
+enum sampling_method { SAMPLE_FAST, SAMPLE_INTERPOLATE,
+		       SAMPLE_RESAMPLE_INTERPOLATE, SAMPLE_RESAMPLE_FAST };
 
 extern "C"
 {
@@ -81,6 +60,18 @@ const char* resid_version_string = VERSION;
 #endif
 }
 
-RESID_NAMESPACE_STOP
+// Inlining on/off.
+#define RESID_INLINING 1
+#define RESID_INLINE inline
+
+#ifdef RESID_DLL
+#ifdef RESID_EXPORTS
+#define RESID_API __declspec(dllexport)
+#else
+#define RESID_API __declspec(dllimport)
+#endif // RESID_EXPORTS
+#else // !RESID_DLL
+#define RESID_API
+#endif // RESID_DLL
 
 #endif // not __SIDDEFS_H__
