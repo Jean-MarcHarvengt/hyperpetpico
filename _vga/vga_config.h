@@ -52,7 +52,7 @@
 #define VGA_SMALL	B0	// mask of all state machines
 
 // VGA DMA
-#define VGA_DMA		  2		// VGA DMA base channel
+#define VGA_DMA		  VGA_DMA_CHANNEL // VGA DMA base channel
 #define VGA_DMA_CB0	  (VGA_DMA+0)	// VGA DMA channel - control block of base layer
 #define VGA_DMA_PIO0  (VGA_DMA+1)	// VGA DMA channel - copy data of base layer to PIO (raises IRQ0 on quiet)
 

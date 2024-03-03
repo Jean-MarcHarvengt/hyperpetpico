@@ -6,7 +6,6 @@
 #include "include.h"
 #include "petfont.h"
 #include "reSID.h"
-//#include "libcsid.h"
 
 #include "pwm_audio.h"
 #include "petbus.h"
@@ -155,10 +154,9 @@ void __not_in_flash("AudioRender") AudioRender(void)
 #endif
 }
 
-static void audio_fill_buffer( uint8_t * stream, int len )
+static void audio_fill_buffer( audio_sample * stream, int len )
 {
   playSID.update(SOUNDRATE, (void *)stream, len);
-  //libcsid_render(&buffer[0], (unsigned short int*)stream, len); 
 }
 
 
@@ -354,6 +352,24 @@ void __not_in_flash("VideoRenderUpdate") VideoRenderUpdate(void)
     for (int i=cur; i < SPRITE_NUM_MAX; i++)
     {
       SpriteParams[cur].y = MAXHEIGHT;
+    }
+
+    // sprite collision for first 8 sprites
+    for (int i = 0; i < SPRITE_NUM_MAX; i++)
+    {
+      uint16_t x1 = (mem[REG_SPRITE_XHI+i]<<8)+mem[REG_SPRITE_XLO+i];    
+      uint8_t y1 = mem[REG_SPRITE_Y+i]; 
+      uint8_t colbits = 0;      
+      for (int k = 0; k < 8; k++)
+      {
+        uint16_t x = (mem[REG_SPRITE_XHI+k]<<8)+mem[REG_SPRITE_XLO+k];    
+        uint8_t y = mem[REG_SPRITE_Y+k];
+        if ( (x >= x1) && (x < (x1+SPRITEW)) && (y >= y1) && (y < (y1+SPRITEH)) )
+        {
+          colbits += (1<<k);
+        }  
+      }
+      mem[REG_SPRITE_COLI+i] = colbits; 
     }
 }
 
@@ -1105,9 +1121,22 @@ static void pet_start(void)
   input_delay = INPUT_DELAY;
 }
 
+#define PET_CYCLES 16600 //9000
+
 static void pet_step(void) 
 {
-  mos.Run(9000);
+  mos.Run(PET_CYCLES);
+  mos.IRQ();
+}
+
+static void pet_line(void) 
+{
+  mos.Run(PET_CYCLES/320);
+}
+
+static void pet_remaining(void) 
+{
+  mos.Run((PET_CYCLES/320)*120);
   mos.IRQ();
 }
 
@@ -1333,8 +1362,6 @@ static const struct tftp_context tftp = {
 // ****************************************
 // Main
 // ****************************************
-#define VID_CNT 200
-
 int main()
 {
 #ifndef HAS_PETIO
@@ -1376,10 +1403,8 @@ int main()
 #ifndef HAS_PETIO
   printf("Init Audio...\n");
 #endif
-  playSID.begin(SOUNDRATE, 800);
-  //libcsid_init(SOUNDRATE, SIDMODEL_6581);  
-  pwm_audio_init(1600, audio_fill_buffer);
-
+  playSID.begin(SOUNDRATE, 750);
+  pwm_audio_init(1500, audio_fill_buffer);
 
 #ifndef HAS_PETIO
   printf("Init Emu...\n");
@@ -1403,16 +1428,10 @@ int main()
       pwm_audio_reset();
     }
 
+#ifdef HAS_PETIO  
     WaitVSync();
-//    WaitScanline(50);
-//mem[REG_BG_COL] = 0xff;
-    sid_dump();
-    pwm_audio_handle_buffer();
-    //sleep_ms(3);
-//mem[REG_BG_COL] = 0x00;
-    handleCmdQueue();
-
-#ifndef HAS_PETIO  
+#else
+    WaitVSync();
     // tinyusb host task
     tuh_task();
 
@@ -1426,7 +1445,16 @@ int main()
     
     if (pet_running)
     {
-      pet_step();
+//      pet_step();
+      pet_remaining();
+      for (int i=0;i<200;i++) 
+      { 
+//        WaitScanline(50+(i));
+//mem[REG_BG_COL] = i+1;
+        pet_line();
+      }
+//mem[REG_BG_COL] = 0x00;
+
       if (prg_start) 
       {
         if (input_delay != 0 ) 
@@ -1487,25 +1515,11 @@ int main()
     slowdown+=1;
     slowdown&=7;
 #endif
-/*
-    mem[REG_SPRITE_XLO] += 1;
-
-    if ( LAYER_L0_ENA )
-    {
-      uint16_t scroll = GET_XSCROLL_L0;
-      if (scroll++ == screen_width) scroll = 0;
-      SET_XSCROLL_L0(scroll);      
-    }
-    if ( LAYER_L1_ENA )
-    {
-      if (slowdown == 0) 
-      {
-        uint16_t scroll = GET_XSCROLL_L1;
-        if (scroll++ == screen_width) scroll = 0;
-        SET_XSCROLL_L1(scroll);
-      }
-    }
-*/
+//mem[REG_BG_COL] = 0xff;
+    sid_dump();
+    pwm_audio_handle_buffer();
+    handleCmdQueue();
+//mem[REG_BG_COL] = 0x00;
   }
 }
 

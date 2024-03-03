@@ -19,6 +19,8 @@
 
 #include "sid.h"
 #include <math.h>
+// JMH adapted hyperpetpico  
+#include "global.h"
 
 // ----------------------------------------------------------------------------
 // Constructor.
@@ -755,8 +757,10 @@ int SID::clock_fast(cycle_count& delta_t, short* buf, int n,
 		    int interleave)
 {
   int s = 0;
-  // JMH adapted for hyptpetpico
+#ifdef AUDIO_8BIT
+  // JMH adapted for hyperpetpico
   unsigned char * buf8 = (unsigned char *)buf;
+#endif
 
   for (;;) {
     cycle_count next_sample_offset = sample_offset + cycles_per_sample + (1 << (FIXP_SHIFT - 1));
@@ -770,9 +774,12 @@ int SID::clock_fast(cycle_count& delta_t, short* buf, int n,
     clock(delta_t_sample);
     delta_t -= delta_t_sample;
     sample_offset = (next_sample_offset & FIXP_MASK) - (1 << (FIXP_SHIFT - 1));
-    // JMH adapted for hyptpetpico
-    //buf[s++*interleave] = output();
+    // JMH adapted for hyperpetpico
+#ifdef AUDIO_8BIT
     buf8[s++] = output()+128;
+#else
+    buf[s++*interleave] = output()+128;
+#endif
   }
 
   clock(delta_t);

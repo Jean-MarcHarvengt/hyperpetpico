@@ -10,13 +10,18 @@
 #define SIXTYHZ         1     // 60Hz mode
 #define EIGHTYCOL       1     // 80 column mode
 #define WIFI_AP         1     // WIFI as access point (preferred!)
+
+//#define AUDIO_8BIT      1     // audio samples are 8bits
 #define AUDIO_IRQ       1     // handle audio with IRQ
+//#define AUDIO_DMA       1     // handle audio with IRQ DMA
 //#define RETROVGA        1
 #ifdef RETROVGA 
 #define AUDIO_PIN       9
 #else
 #define AUDIO_PIN       21
 #endif
+#define VGA_DMA_CHANNEL 2 // requires 2 channels
+#define AUD_DMA_CHANNEL 4 // requires 1 or 3 channels
 
 // ----------------------------------------------------------------------------
 //                              Base data types

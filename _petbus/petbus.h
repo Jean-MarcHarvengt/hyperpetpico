@@ -150,6 +150,7 @@
 #define REG_LINES_L1_XSCR (0x9d90 - 0x8000) // 40336
 
 #define REG_SID_BASE      (0x9f00 - 0x8000) // 40192
+#define REG_SPRITE_COLI   (0x9f80 - 0x8000) // 40832
 
 #define GET_VIDEO_MODE    ( mem[REG_VIDEO_MODE] )
 #define GET_BG_COL        ( mem[REG_BG_COL] )

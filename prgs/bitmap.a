@@ -152,6 +152,12 @@ copy1:
 
 
 bitmap:
-;!bin "bitmap.cru"
-!bin "bitmap2.cru"
+!bin "bmp_starwars1.cru"
+;!bin "bmp_starwars2.cru"
+;!bin "bmp_bobafat.cru"
+;!bin "bmp_darkvador.cru"
+;!bin "bmp_jabba.cru"
+;!bin "bmp_padawan.cru"
+
+
 bitmap_end:
