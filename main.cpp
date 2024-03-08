@@ -149,7 +149,7 @@ static u8 prev_sid_reg[26];
 
 void __not_in_flash("AudioRender") AudioRender(void)
 {
-#ifndef AUDIO_IRQ
+#ifdef AUDIO_CBACK
   pwm_audio_handle_sample();
 #endif
 }
@@ -371,6 +371,9 @@ void __not_in_flash("VideoRenderUpdate") VideoRenderUpdate(void)
       }
       mem[REG_SPRITE_COLI+i] = colbits; 
     }
+#ifndef HAS_PETIO
+//  multicore_fifo_push_blocking(1);
+#endif
 }
 
 
@@ -540,6 +543,9 @@ void __not_in_flash("VideoRenderLineL1") VideoRenderLineL1(u8 * linebuffer, int 
       *dst32=color32;
     }
   }
+#ifndef HAS_PETIO
+//  multicore_fifo_push_blocking(0);  
+#endif
 }
 
 static void VideoRenderInit(void)
@@ -1140,6 +1146,27 @@ static void pet_remaining(void)
   mos.IRQ();
 }
 
+static uint8_t petcol = 0;
+static void core0_sio_irq() {
+  irq_clear(SIO_IRQ_PROC0);
+  while(multicore_fifo_rvalid()) {
+    uint16_t raw = multicore_fifo_pop_blocking();
+    if (pet_running)
+    {    
+      if (raw == 0) {
+        petcol = petcol + 1;
+        pet_line();
+      }  
+      else {
+        petcol = 0;
+        pet_remaining();
+      }  
+      //mem[REG_BG_COL] = petcol;
+    }  
+  } 
+  multicore_fifo_clear_irq();
+}
+
 static void _set(uint8_t k) {
   _rows[(k & 0xf0) >> 4] |= 1 << (k & 0x0f);
 }
@@ -1403,12 +1430,17 @@ int main()
 #ifndef HAS_PETIO
   printf("Init Audio...\n");
 #endif
-  playSID.begin(SOUNDRATE, 750);
-  pwm_audio_init(1500, audio_fill_buffer);
+  //31500/60=525,31500/50=630 samples per frame
+  //22050/60=367,22050/50=441 samples per frame
+  pwm_audio_init(2048, audio_fill_buffer);
+  playSID.begin(SOUNDRATE, 1024);
 
 #ifndef HAS_PETIO
   printf("Init Emu...\n");
   pet_start();
+  multicore_fifo_clear_irq();
+//  irq_set_exclusive_handler(SIO_IRQ_PROC0,core0_sio_irq);   
+//  irq_set_enabled(SIO_IRQ_PROC0,true);  
 #endif
 
   // main loop
@@ -1445,16 +1477,8 @@ int main()
     
     if (pet_running)
     {
-//      pet_step();
-      pet_remaining();
-      for (int i=0;i<200;i++) 
-      { 
-//        WaitScanline(50+(i));
-//mem[REG_BG_COL] = i+1;
-        pet_line();
-      }
+      pet_step();
 //mem[REG_BG_COL] = 0x00;
-
       if (prg_start) 
       {
         if (input_delay != 0 ) 
@@ -1520,6 +1544,7 @@ int main()
     pwm_audio_handle_buffer();
     handleCmdQueue();
 //mem[REG_BG_COL] = 0x00;
+//    __wfi();    
   }
 }
 

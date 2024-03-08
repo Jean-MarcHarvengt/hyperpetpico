@@ -11,9 +11,17 @@
 #define EIGHTYCOL       1     // 80 column mode
 #define WIFI_AP         1     // WIFI as access point (preferred!)
 
-//#define AUDIO_8BIT      1     // audio samples are 8bits
-#define AUDIO_IRQ       1     // handle audio with IRQ
-//#define AUDIO_DMA       1     // handle audio with IRQ DMA
+#define AUDIO_8BIT      1     // audio samples are 8bits
+
+//#define AUDIO_CBACK     1     // handle audio samples from VGA line callback
+//#define AUDIO_IRQ       1     // handle audio samples from IRQ
+//#define AUDIO_1DMA      1     // handle audio samples with 1 DMA
+#define AUDIO_3DMA      1     // handle audio samples with 3 DMA
+
+#ifdef AUDIO_1DMA
+#undef AUDIO_8BIT
+#endif
+
 //#define RETROVGA        1
 #ifdef RETROVGA 
 #define AUDIO_PIN       9
