@@ -137,7 +137,7 @@ static bool font_lowercase = false;
 static ALIGNED u8 TileData[TILE_MAXDATA];
 
 // PET shadow memory 8000-9fff
-static unsigned char mem[0x2000];
+unsigned char mem[0x2000];
 static bool pet_reset = false;
 
 
@@ -284,6 +284,7 @@ static void VideoSetup(void)
 
 void __not_in_flash("VideoRenderUpdate") VideoRenderUpdate(void)
 {
+    mem[REG_VSYNC] = MAXHEIGHT;
     int vmode = GET_VIDEO_MODE;
     if (video_mode != vmode) {
       if (vmode == 0) VideoInit(0, false);  
@@ -371,14 +372,18 @@ void __not_in_flash("VideoRenderUpdate") VideoRenderUpdate(void)
       }
       mem[REG_SPRITE_COLI+i] = colbits; 
     }
+    sid_dump();
 #ifndef HAS_PETIO
-//  multicore_fifo_push_blocking(1);
+#ifdef EMU_ACCURATE
+    multicore_fifo_push_blocking(1);
+#endif
 #endif
 }
 
 
 void __not_in_flash("VideoRenderLineBG") VideoRenderLineBG(u8 * linebuffer, int scanline)
 {
+  mem[REG_VSYNC] = scanline;
   // Background color
   uint32_t bgcolor32 = (mem[REG_BG_COL]<<24)+(mem[REG_BG_COL]<<16)+(mem[REG_BG_COL]<<8)+(mem[REG_BG_COL]);
   uint32_t * dst32 = (uint32_t *)linebuffer;      
@@ -544,7 +549,9 @@ void __not_in_flash("VideoRenderLineL1") VideoRenderLineL1(u8 * linebuffer, int 
     }
   }
 #ifndef HAS_PETIO
-//  multicore_fifo_push_blocking(0);  
+#ifdef EMU_ACCURATE
+    multicore_fifo_push_blocking(0);
+#endif 
 #endif
 }
 
@@ -619,6 +626,12 @@ static void VideoRenderInit(void)
   SET_VIDEO_MODE(1);
 #endif  
 #endif
+}
+
+static void SystemReset(void)
+{  
+  VideoRenderInit();
+  pwm_audio_reset();
 }
 
 // ****************************************
@@ -1017,7 +1030,7 @@ static const uint8_t asciimap[8*10] = {
 /* 4  |*/ 0x14, 0x50, 0x49, 0xDC, 0x59, 0x52, 0x57, 0x09,
 /* 3  |*/ 0xB6, 0xC0, 0x4C, 0x0D, 0x4A, 0x47, 0x44, 0x41,
 /* 2  |*/ 0xB5, 0x3B, 0x4B, 0xDD, 0x48, 0x46, 0x53, 0x9B,
-/* 1  |*/ 0xB9, 0x06, 0xDE, 0xB7, 0xB0, 0x37, 0x34, 0x31,
+/* 1  |*/ 0xB9, 0x06, 0xDE, 0xB7, 0x30, 0x37, 0x34, 0x31,
 /* 0  |*/ 0x05, 0x0E, 0x1D, 0xB8, 0x2D, 0x38, 0x35, 0x32
 };
 
@@ -1127,7 +1140,8 @@ static void pet_start(void)
   input_delay = INPUT_DELAY;
 }
 
-#define PET_CYCLES 16600 //9000
+#define PET_LINES  (260)
+#define PET_CYCLES (PET_LINES*64) //16600 //9000
 
 static void pet_step(void) 
 {
@@ -1135,14 +1149,15 @@ static void pet_step(void)
   mos.IRQ();
 }
 
+#ifdef EMU_ACCURATE
 static void pet_line(void) 
 {
-  mos.Run(PET_CYCLES/320);
+  mos.Run(PET_CYCLES/PET_LINES);
 }
 
 static void pet_remaining(void) 
 {
-  mos.Run((PET_CYCLES/320)*120);
+  mos.Run((PET_CYCLES/PET_LINES)*(PET_LINES-MAXHEIGHT));
   mos.IRQ();
 }
 
@@ -1166,6 +1181,7 @@ static void core0_sio_irq() {
   } 
   multicore_fifo_clear_irq();
 }
+#endif
 
 static void _set(uint8_t k) {
   _rows[(k & 0xf0) >> 4] |= 1 << (k & 0x0f);
@@ -1435,49 +1451,47 @@ int main()
   pwm_audio_init(2048, audio_fill_buffer);
   playSID.begin(SOUNDRATE, 1024);
 
-#ifndef HAS_PETIO
+#ifdef HAS_PETIO
+  // main loop
+  petbus_poll_loop(SystemReset);
+  /*
+  while (true)
+  {
+  }
+  */
+    
+#else
   printf("Init Emu...\n");
   pet_start();
+#ifdef EMU_ACCURATE
   multicore_fifo_clear_irq();
-//  irq_set_exclusive_handler(SIO_IRQ_PROC0,core0_sio_irq);   
-//  irq_set_enabled(SIO_IRQ_PROC0,true);  
-#endif
-
+  irq_set_exclusive_handler(SIO_IRQ_PROC0,core0_sio_irq);   
+  irq_set_enabled(SIO_IRQ_PROC0,true);  
+#endif  
   // main loop
   while (true)
   {
-#ifdef HAS_PETIO  
-    if (petbus_poll_reset())
-    {
-#else
     if (pet_reset)
     {
       pet_reset = false;
       mos.Reset();
       pet_running = true;
-#endif
-      VideoRenderInit();
-      pwm_audio_reset();
+      SystemReset();
     }
-
-#ifdef HAS_PETIO  
-    WaitVSync();
-#else
     WaitVSync();
     // tinyusb host task
     tuh_task();
-
 #if CFG_TUH_CDC
     cdc_task();
 #endif
-
 #if CFG_TUH_HID
     hid_app_task();
 #endif
-    
     if (pet_running)
     {
+#ifndef EMU_ACCURATE
       pet_step();
+#endif
 //mem[REG_BG_COL] = 0x00;
       if (prg_start) 
       {
@@ -1538,15 +1552,16 @@ int main()
     }
     slowdown+=1;
     slowdown&=7;
-#endif
-//mem[REG_BG_COL] = 0xff;
-    sid_dump();
-    pwm_audio_handle_buffer();
-    handleCmdQueue();
-//mem[REG_BG_COL] = 0x00;
+//    mem[REG_BG_COL] = 0xff;
+//    mem[REG_BG_COL] = 0x00;
 //    __wfi();    
   }
+#endif
 }
 
+void Core1Call(void) {
+    pwm_audio_handle_buffer();
+    handleCmdQueue();
+} 
 
 

@@ -71,7 +71,9 @@
 //       5-7: ycurtain
 //        0: on/off
 //        1: 8/16 pixels top
-// 9b0f: spare!!!
+//
+// 9b0f: vsync line (0-200, 200 is overscan)
+//
 // 9b10: 3-0: transfer mode 
 //       1/2/4/8 bits per pixel (using indexed CLUT)
 //       9 = 8 bits RGB332 no CLUT
@@ -138,6 +140,7 @@
 #define REG_SC_END_L1     (0x9b0c - 0x8000) // 39692
 #define REG_FG_COL        (0x9b0d - 0x8000) // 39693
 #define REG_TILES_CFG     (0x9b0e - 0x8000) // 39694
+#define REG_VSYNC         (0x9b0f - 0x8000) // 39695
 
 #define REG_TDEPTH        (0x9b10 - 0x8000) // 39696
 #define REG_TCOMMAND      (0x9b11 - 0x8000) // 39697
@@ -224,7 +227,8 @@
 
 #ifdef HAS_PETIO
 extern void petbus_init(void (*mem_write_callback)(uint16_t address, uint8_t value));
-extern bool petbus_poll_reset(void);
+extern void petbus_poll_loop(void (*reset_callback)(void));
+
 #endif
 
 #endif

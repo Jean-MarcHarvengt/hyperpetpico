@@ -7,6 +7,9 @@
 //#define HAS_PETIO       1  	// PET extension (or standalone emu)
 //#define HAS_NETWORK     1     // enable network wifi (standalone mode emu only)  
 
+//#define PETIO_IRQ       1     // handle petio from IRQ
+#define EMU_ACCURATE    1     // per line emulation
+
 #define SIXTYHZ         1     // 60Hz mode
 #define EIGHTYCOL       1     // 80 column mode
 #define WIFI_AP         1     // WIFI as access point (preferred!)
