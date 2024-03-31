@@ -977,7 +977,7 @@ static bool prg_start = false;
 static uint8_t input_delay = INPUT_DELAY;
 static uint8_t input_pt = 0;
 //static const uint8_t input_cmd[] = {'L', 'I', 'S', 'T', 0x0d, 'R', 'U', 'N', 0x0d, 0}; // LIST + RUN
-static const uint8_t input_cmd[] = {'@', '^', '[', ']', '/', '\\', 0}; // LIST + RUN
+static const uint8_t input_cmd[] = {'R', 'U', 'N', 0x0d, 0}; // RUN 
 static uint8_t input_chr;
 static uint8_t _rows[0x10];
 static uint8_t _row;
