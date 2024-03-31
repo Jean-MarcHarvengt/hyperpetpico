@@ -219,26 +219,138 @@ static int conv_table_us[128][2] =
     {KBD_KEY_LEFT, KBD_KEY_LEFT }, /* 0x50 */ \
     {KBD_KEY_DOWN, KBD_KEY_DOWN }, /* 0x51 */ \
     {KBD_KEY_UP, KBD_KEY_UP }, /* 0x52 */ \
-    {0     , 0      }, /* 0x53 */ \
+    { 0   , 0       }, /* 0x53 */ \
                                   \
-    {'/'   , '/'    }, /* 0x54 */ \
-    {'*'   , '*'    }, /* 0x55 */ \
-    {'-'   , '-'    }, /* 0x56 */ \
-    {'+'   , '+'    }, /* 0x57 */ \
-    {'\r'  , '\r'   }, /* 0x58 */ \
-    {'1'   , 0      }, /* 0x59 */ \
-    {'2'   , 0      }, /* 0x5a */ \
-    {'3'   , 0      }, /* 0x5b */ \
-    {'4'   , 0      }, /* 0x5c */ \
-    {'5'   , '5'    }, /* 0x5d */ \
-    {'6'   , 0      }, /* 0x5e */ \
-    {'7'   , 0      }, /* 0x5f */ \
-    {'8'   , 0      }, /* 0x60 */ \
-    {'9'   , 0      }, /* 0x61 */ \
-    {'0'   , 0      }, /* 0x62 */ \
-    {'0'   , 0      }, /* 0x63 */ \
-    {'='   , '='    }, /* 0x67 */ \
+    { 0   , 0       }, /* 0x54 */ \
+    { 0   , 0       }, /* 0x55 */ \
+    { 0   , 0       }, /* 0x56 */ \
+    { 0   , 0       }, /* 0x57 */ \
+    { 0   , 0       }, /* 0x58 */ \
+    { 0   , 0       }, /* 0x59 */ \
+    { 0   , 0       }, /* 0x5a */ \
+    { 0   , 0       }, /* 0x5b */ \
+    { 0   , 0       }, /* 0x5c */ \
+    { 0   , 0       }, /* 0x5d */ \
+    { 0   , 0       }, /* 0x5e */ \
+    { 0   , 0       }, /* 0x5f */ \
+    { 0   , 0       }, /* 0x60 */ \
+    { 0   , 0       }, /* 0x61 */ \
+    { 0   , 0       }, /* 0x62 */ \
+    { 0   , 0       }, /* 0x63 */ \
+    { 0   , 0       }, /* 0x64 */ \
+    { 0   , 0       }, /* 0x65 */ \
+    { 0   , 0       }, /* 0x66 */ \
+    { 0   , 0       }, /* 0x67 */ \
 };
+
+static int conv_table_be[128][2] = 
+{
+    {0     , 0      }, /* 0x00 */ \
+    {0     , 0      }, /* 0x01 */ \
+    {0     , 0      }, /* 0x02 */ \
+    {0     , 0      }, /* 0x03 */ \
+    {'q'   , 'Q'    }, /* 0x04 */ \
+    {'b'   , 'B'    }, /* 0x05 */ \
+    {'c'   , 'C'    }, /* 0x06 */ \
+    {'d'   , 'D'    }, /* 0x07 */ \
+    {'e'   , 'E'    }, /* 0x08 */ \
+    {'f'   , 'F'    }, /* 0x09 */ \
+    {'g'   , 'G'    }, /* 0x0a */ \
+    {'h'   , 'H'    }, /* 0x0b */ \
+    {'i'   , 'I'    }, /* 0x0c */ \
+    {'j'   , 'J'    }, /* 0x0d */ \
+    {'k'   , 'K'    }, /* 0x0e */ \
+    {'l'   , 'L'    }, /* 0x0f */ \
+    {','   , '?'    }, /* 0x10 */ \
+    {'n'   , 'N'    }, /* 0x11 */ \
+    {'o'   , 'O'    }, /* 0x12 */ \
+    {'p'   , 'P'    }, /* 0x13 */ \
+    {'a'   , 'A'    }, /* 0x14 */ \
+    {'r'   , 'R'    }, /* 0x15 */ \
+    {'s'   , 'S'    }, /* 0x16 */ \
+    {'t'   , 'T'    }, /* 0x17 */ \
+    {'u'   , 'U'    }, /* 0x18 */ \
+    {'v'   , 'V'    }, /* 0x19 */ \
+    {'z'   , 'Z'    }, /* 0x1a */ \
+    {'x'   , 'X'    }, /* 0x1b */ \
+    {'y'   , 'Y'    }, /* 0x1c */ \
+    {'w'   , 'W'    }, /* 0x1d */ \
+    {'1'   , '&'    }, /* 0x1e */ \
+    {'2'   , '@'    }, /* 0x1f */ \
+    {'3'   , '\"'   }, /* 0x20 */ \
+    {'4'   , '\''   }, /* 0x21 */ \
+    {'5'   , '('    }, /* 0x22 */ \
+    {'6'   , 0      }, /* 0x23 */ \
+    {'7'   , 0      }, /* 0x24 */ \
+    {'8'   , '!'    }, /* 0x25 */ \
+    {'9'   , '{'    }, /* 0x26 */ \
+    {'0'   , '}'    }, /* 0x27 */ \
+    {KBD_KEY_ENTER  , KBD_KEY_ENTER   }, /* 0x28 */ \
+    {0     , 0      }, /*{'\x1b', '\x1b' },*/ /* 0x29 ESC*/ \
+    {KBD_KEY_BS  , KBD_KEY_BS }, /* 0x2a */ \
+    {'\t'  , '\t'   }, /* 0x2b */ \
+    {' '   , ' '    }, /* 0x2c */ \
+    {')'   , 0      }, /* 0x2d */ \
+    {'-'   , '_'    }, /* 0x2e */ \
+    {'^'   , '['    }, /* 0x2f */ \
+    {'$'   , ']'    }, /* 0x30 */ \
+    {0     , 0      }, /* 0x31 */ \
+    {0     , 0      }, /* 0x32 */ \
+    {'m'   , 'M'    }, /* 0x33 */ \
+    {0     , '%'    }, /* 0x34 */ \
+    {0     , 0      }, /*{'`'   , '~'    },*/ /* 0x35 */ \
+    {';'   , '.'    }, /* 0x36 */ \
+    {':'   , '/'    }, /* 0x37 */ \
+    {'='   , '+'    }, /* 0x38 */ \
+    {0     , 0      }, /* 0x39 */ \
+    {0     , 0      }, /* 0x3a */ \
+    {0     , 0      }, /* 0x3b */ \
+    {0     , 0      }, /* 0x3c */ \
+    {0     , 0      }, /* 0x3d */ \
+    {0     , 0      }, /* 0x3e */ \
+    {0     , 0      }, /* 0x3f */ \
+    {0     , 0      }, /* 0x40 */ \
+    {0     , 0      }, /* 0x41 */ \
+    {0     , 0      }, /* 0x42 */ \
+    {0     , 0      }, /* 0x43 */ \
+    {0     , 0      }, /* 0x44 */ \
+    {0     , 0      }, /* 0x45 */ \
+    {0     , 0      }, /* 0x46 */ \
+    {0     , 0      }, /* 0x47 */ \
+    {0     , 0      }, /* 0x48 */ \
+    {0     , 0      }, /* 0x49 */ \
+    {KBD_KEY_HOME , KBD_KEY_HOME}, /* 0x4a */ \
+    {KBD_KEY_PGUP , KBD_KEY_PGUP}, /* 0x4b */ \
+    {0     , 0      }, /* 0x4c */ \
+    {KBD_KEY_END, KBD_KEY_END}, /* 0x4d */ \
+    {KBD_KEY_PGDN , KBD_KEY_PGDN }, /* 0x4e */ \
+    {KBD_KEY_RIGHT, KBD_KEY_RIGHT }, /* 0x4f */ \
+    {KBD_KEY_LEFT, KBD_KEY_LEFT }, /* 0x50 */ \
+    {KBD_KEY_DOWN, KBD_KEY_DOWN }, /* 0x51 */ \
+    {KBD_KEY_UP, KBD_KEY_UP }, /* 0x52 */ \
+    { 0   , 0       }, /* 0x53 */ \
+    { 0   , 0       }, /* 0x54 */ \
+    { 0   , 0       }, /* 0x55 */ \
+    { 0   , 0       }, /* 0x56 */ \
+    { 0   , 0       }, /* 0x57 */ \
+    { 0   , 0       }, /* 0x58 */ \
+    { 0   , 0       }, /* 0x59 */ \
+    { 0   , 0       }, /* 0x5a */ \
+    { 0   , 0       }, /* 0x5b */ \
+    { 0   , 0       }, /* 0x5c */ \
+    { 0   , 0       }, /* 0x5d */ \
+    { 0   , 0       }, /* 0x5e */ \
+    { 0   , 0       }, /* 0x5f */ \
+    { 0   , 0       }, /* 0x60 */ \
+    { 0   , 0       }, /* 0x61 */ \
+    { 0   , 0       }, /* 0x62 */ \
+    { 0   , 0       }, /* 0x63 */ \
+    { '<' , '>'     }, /* 0x64 */ \
+    { 0   , 0       }, /* 0x65 */ \
+    { 0   , 0       }, /* 0x66 */ \
+    { 0   , 0       }, /* 0x67 */ \
+};
+
 
 /* =================  End keycode translation table. ================== */
 
@@ -272,32 +384,42 @@ static inline bool is_key_held (hid_keyboard_report_t const *report, uint8_t key
 static void process_kbd_report (hid_keyboard_report_t const *report)
 {
   static hid_keyboard_report_t prev_report = { 0, 0, {0} };
-  static int prev_ch,prev_flags, prev_keycode;
+  static int prev_ch, prev_chshift, prev_flags, prev_keycode;
   int found=0;
+  bool is_lshift_pressed = report->modifier 
+    & KEYBOARD_MODIFIER_LEFTSHIFT;
+  bool is_lctrl_pressed = report->modifier 
+    & KEYBOARD_MODIFIER_LEFTCTRL;
+  bool is_lalt_pressed = report->modifier 
+    & KEYBOARD_MODIFIER_LEFTALT;  
+  bool is_rshift_pressed = report->modifier 
+    & (KEYBOARD_MODIFIER_RIGHTSHIFT);
+  bool is_rctrl_pressed = report->modifier 
+    & KEYBOARD_MODIFIER_RIGHTCTRL;
+  bool is_ralt_pressed = report->modifier 
+    & KEYBOARD_MODIFIER_RIGHTALT;  
   for (uint8_t i=0; i < 6; i++) 
   {
     if (report->keycode[i]) 
     {
-      bool const is_shift_pressed = report->modifier 
-        & (KEYBOARD_MODIFIER_LEFTSHIFT | KEYBOARD_MODIFIER_RIGHTSHIFT);
-      int ch = conv_table_us [report->keycode[i]][is_shift_pressed];
-      bool const is_ctrl_pressed = report->modifier 
-        & (KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_RIGHTCTRL);
-      bool const is_alt_pressed = report->modifier 
-        & (KEYBOARD_MODIFIER_LEFTALT | KEYBOARD_MODIFIER_RIGHTALT);
+      int ch = conv_table_be[report->keycode[i]][0];
+      int chshift = conv_table_be[report->keycode[i]][is_lshift_pressed?1:0];
       int flags = 0;
-      if (is_shift_pressed) flags |= KBD_FLAG_SHIFT;
-      if (is_ctrl_pressed) flags |= KBD_FLAG_CONTROL;
-      if (is_alt_pressed) flags |= KBD_FLAG_ALT;
-
+      if (is_lshift_pressed) flags |= KBD_FLAG_LSHIFT;
+      if (is_lctrl_pressed) flags |= KBD_FLAG_LCONTROL;
+      if (is_lalt_pressed) flags |= KBD_FLAG_LALT;
+      if (is_rshift_pressed) flags |= KBD_FLAG_RSHIFT;
+      if (is_rctrl_pressed) flags |= KBD_FLAG_RCONTROL;
+      if (is_ralt_pressed) flags |= KBD_FLAG_RALT;
       if (!is_key_held (&prev_report, report->keycode[i])) 
       {        
         // Call back into the application, passing the keystroke and a
         //   set of flags that indicate which modifiers are held down.
         //printf("down %d %d %d\r\n",report->keycode[i], ch, flags);
-        kbd_signal_raw_key(ch, flags, KEY_PRESSED);
+        /*if (ch)*/ kbd_signal_raw_key(report->keycode[i], ch, chshift, flags, KEY_PRESSED);
         prev_keycode = report->keycode[i];
         prev_ch = ch;
+        prev_chshift = chshift;
         prev_flags = flags;
         found = 1;
       } 
@@ -308,7 +430,7 @@ static void process_kbd_report (hid_keyboard_report_t const *report)
     if (prev_keycode) 
     {
       //printf("up %d %d %d\r\n",prev_keycode, prev_ch, prev_flags);
-      kbd_signal_raw_key(prev_ch, prev_flags, KEY_RELEASED);
+      kbd_signal_raw_key(prev_keycode, prev_ch, prev_chshift, prev_flags, KEY_RELEASED);
       prev_keycode = 0;
     }     
   }  

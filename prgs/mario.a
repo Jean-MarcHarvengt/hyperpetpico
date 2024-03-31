@@ -76,7 +76,10 @@ REG_TILES_CFG     = $9b0e
 ; 5-7: ycurtain top
 ;  0: on/off
 ;  1: 8/16 pixels
-
+;
+; vsync line (0-200, 200 is overscan)
+REG_VSYNC         = $9b0f
+;
 ; data transfer
 REG_TLOOKUP       = $9a00
 REG_TDEPTH        = $9b10
@@ -114,6 +117,8 @@ NB_SPRITES_TOTAL        = 96
 *= $0800
         lda #2                  ; 256x200 (32x25)
         sta REG_VIDEO_MODE
+        lda #0                  ; black background
+        sta REG_BG_COL
 
         ldx #$00                ; clear screen L1 (text)
         lda #32

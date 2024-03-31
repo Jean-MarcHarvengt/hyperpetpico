@@ -137,6 +137,7 @@ void pwm_audio_init(int buffersize, void (*callback)(audio_sample * stream, int 
   pwm_clear_irq(audio_pin_slice);
   pwm_set_irq_enabled(audio_pin_slice, true);    
   irq_set_exclusive_handler(PWM_IRQ_WRAP, AUDIO_isr);
+  irq_set_priority (DMA_IRQ_1, PICO_DEFAULT_IRQ_PRIORITY-8);
   irq_set_enabled(PWM_IRQ_WRAP, true);
 #endif
 #ifdef AUDIO_3DMA
@@ -177,6 +178,7 @@ void pwm_audio_init(int buffersize, void (*callback)(audio_sample * stream, int 
                         );
   dma_channel_set_irq1_enabled(trigger_dma_chan, true);    // fire interrupt when trigger DMA channel is done
   irq_set_exclusive_handler(DMA_IRQ_1, AUDIO_isr);
+  irq_set_priority (DMA_IRQ_1, PICO_DEFAULT_IRQ_PRIORITY-8);
   irq_set_enabled(DMA_IRQ_1, true);
 
   // setup sample DMA channel
@@ -222,6 +224,7 @@ void pwm_audio_init(int buffersize, void (*callback)(audio_sample * stream, int 
   // whole audio buffer
   dma_channel_set_irq1_enabled(pwm_dma_chan, true);
   irq_set_exclusive_handler(DMA_IRQ_1, AUDIO_isr);
+  irq_set_priority (DMA_IRQ_1, PICO_DEFAULT_IRQ_PRIORITY-8);
   irq_set_enabled(DMA_IRQ_1, true);
   dma_channel_start(pwm_dma_chan);
 #endif

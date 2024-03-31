@@ -976,8 +976,8 @@ static bool prg_start = false;
 #define INPUT_DELAY 50
 static uint8_t input_delay = INPUT_DELAY;
 static uint8_t input_pt = 0;
-static const uint8_t input_cmd[] = {'L', 'I', 'S', 'T', 0x0d, 'R', 'U', 'N', 0x0d, 0}; // LIST + RUN
-//static const uint8_t input_cmd[] = {'L', 'I', 'S', 'T', '1', 'R', 'U', 'N', '2', 0}; // LIST + RUN
+//static const uint8_t input_cmd[] = {'L', 'I', 'S', 'T', 0x0d, 'R', 'U', 'N', 0x0d, 0}; // LIST + RUN
+static const uint8_t input_cmd[] = {'@', '^', '[', ']', '/', '\\', 0}; // LIST + RUN
 static uint8_t input_chr;
 static uint8_t _rows[0x10];
 static uint8_t _row;
@@ -1042,6 +1042,7 @@ static uint8_t ascii2rowcol(uint8_t chr)
       int col = 7-(i&7);
       int row = 9-(i>>3);
       rowcol = (row<<4)+col;
+      break;
     }  
   } 
   return rowcol; 
@@ -1191,14 +1192,22 @@ static void _reset(uint8_t k) {
   _rows[(k & 0xf0) >> 4] &= ~(1 << (k & 0x0f));
 }
 
-static void pet_kdown(uint8_t asciicode) {
-  if (asciicode < 0x80)
+static void pet_kdown(uint8_t asciicode, bool shiftl, bool shiftr ) {
+  if (asciicode < 0x80) {
     _set(ascii2rowcol(asciicode));
+    if ( (shiftl) && (shiftr) ) _rows[0]|= 0x40;
+    else if (shiftl) _rows[6]|= 0x01;
+    else if (shiftr) _rows[6]|= 0x40;
+  }
 }
 
 static void pet_kup(uint8_t asciicode) {
-  if (asciicode < 0x80)
-    _reset(ascii2rowcol(asciicode));  
+  if (asciicode < 0x80) {
+    _reset(ascii2rowcol(asciicode));
+    _rows[6] &= 0xfe;
+    _rows[6] &= 0xbf;
+    _rows[0] &= 0xbf;
+  }  
 }
 #endif
 
@@ -1207,34 +1216,60 @@ static void pet_kup(uint8_t asciicode) {
 // ****************************************
 // USB keyboard
 // ****************************************
-char kbd_to_ascii (int code, int flags)
-{
-  // TODO -- I'm not sure how we handle 8-bit key codes, if there 
-  //   are any. I'm sure some keyboards must generate them (or, at least,
-  //   there scancode-to-keycode mappings do. At present, we only
-  //   support US keyboards. Virtual keys like 'up' and 'F1' also
-  //   generate codes > 127, and these also cannot meaningfully be
-  //   converted.
-  if (code > 127) return 0;
-  
-  // We have more work to do here. What about shift-ctrl, shift-alt, etc?
-  if (flags & KBD_FLAG_CONTROL)
-     return (code & ~0x60);
 
-  return code; 
-}
+//static const unsigned char digits[16] = {0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x41,0x42,0x43,0x44,0x45,0x46} ;
 
-void kbd_signal_raw_key (int code, int flags, int pressed)
-{
-  if (pressed == KEY_PRESSED)
-  {
-      pet_kdown(toupper(kbd_to_ascii (code, flags)));
-      //printf("kdown %c\r\n", kbd_to_ascii (code, flags));
+void kbd_signal_raw_key (int keycode, int code, int codeshifted, int flags, int pressed) {
+  //mem[0] = digits[(keycode>>12)&0xf];
+  //mem[1] = digits[(keycode>>8)&0xf];
+  //mem[2] = digits[(keycode>>4)&0xf];
+  //mem[3] = digits[keycode&0xf]; 
+  if (!(flags & (KBD_FLAG_RSHIFT + KBD_FLAG_RCONTROL))) {
+    if (codeshifted == '&') {code = '6'; flags |= KBD_FLAG_RSHIFT; }
+    else if (codeshifted == '\"') {code = '2'; flags |= KBD_FLAG_RSHIFT; }
+    else if (codeshifted == '\'') {code = '7'; flags |= KBD_FLAG_RSHIFT; }
+    else if (codeshifted == '(') {code = '8'; flags |= KBD_FLAG_RSHIFT; }
+    else if (codeshifted == '!') {code = '1'; flags |= KBD_FLAG_RSHIFT; }
+    else if (codeshifted == '*') {code = ':'; flags |= KBD_FLAG_RSHIFT; }
+    else if (codeshifted == '%') {code = '5'; flags |= KBD_FLAG_RSHIFT; }
+    else if (codeshifted == '?') {code = '/'; flags |= KBD_FLAG_RSHIFT; }
+    else if (codeshifted == '.') {code = '.'; 0; }
+    else if (codeshifted == '+') {code = ';'; flags |= KBD_FLAG_RSHIFT; }
+    else if (codeshifted == '>') {code = '.'; flags |= KBD_FLAG_RSHIFT; }
+    else if (codeshifted == ')') {code = '9'; flags |= KBD_FLAG_RSHIFT; }
+    else if (codeshifted == '$') {code = '4'; flags |= KBD_FLAG_RSHIFT; }
+    else if (codeshifted == '=') {code = '-'; flags |= KBD_FLAG_RSHIFT; }
+    else if (codeshifted == '<') {code = ','; flags |= KBD_FLAG_RSHIFT; }
+    else if (codeshifted == KBD_KEY_DOWN) {code = 0x11; flags |= 0; }
+    else if (codeshifted == KBD_KEY_RIGHT) {code = 0x1D; flags |= 0; }
+    else if (codeshifted == KBD_KEY_UP) {code = 0x11; flags |= KBD_FLAG_RSHIFT; }
+    else if (codeshifted == KBD_KEY_LEFT) {code = 0x1D; flags |= KBD_FLAG_RSHIFT; }
+    // no PET chars for below characters!!!
+    else if (codeshifted == '@') {code = 0; flags |= 0; }
+    else if (codeshifted == '[') {code = 0; flags |= 0; }
+    else if (codeshifted == ']') {code = 0; flags |= 0; }
+    else if (codeshifted == '^') {code = 0; flags |= 0; }
+    else if (codeshifted == '{') {code = 0; flags |= 0; }
+    else if (codeshifted == '}') {code = 0; flags |= 0; }
+    else if (codeshifted == '_') {code = 0; flags |= 0; }
+    else if ( (codeshifted >= 'a') && (codeshifted <= 'z') ) { code = toupper(code); }
+    else if ( (codeshifted >= 'A') && (codeshifted <= 'Z') ) { code = codeshifted; flags |= KBD_FLAG_RSHIFT; }
+    else code = codeshifted;
   }
-  else 
-  {
-      pet_kup(toupper(kbd_to_ascii (code, flags)));
+  else {
+    code = toupper(code);
+  }     
+  if (code) {
+    if (pressed == KEY_PRESSED)
+    {
+      pet_kdown(code, flags & KBD_FLAG_RSHIFT, flags & KBD_FLAG_RCONTROL);
+      //printf("kdown %c\r\n", kbd_to_ascii (code, flags));
+    }
+    else 
+    {
+      pet_kup(code);
       //printf("kup %c\r\n", kbd_to_ascii (code, flags));
+    }
   }
 }
 #endif
@@ -1313,6 +1348,13 @@ static void* tftp_open(const char* fname, const char* mode, u8_t is_write)
     prg_skip = true;
   }
   else if (!strcmp(fname,"key") ) 
+  {
+    pet_running = true;  
+    prg_skip = true;
+    input_chr = ' ';
+    //input_delay = INPUT_DELAY;
+  }
+  else if (!strcmp(fname,"key1") ) 
   {
     pet_running = true;  
     prg_skip = true;
@@ -1465,7 +1507,8 @@ int main()
   pet_start();
 #ifdef EMU_ACCURATE
   multicore_fifo_clear_irq();
-  irq_set_exclusive_handler(SIO_IRQ_PROC0,core0_sio_irq);   
+  irq_set_exclusive_handler(SIO_IRQ_PROC0,core0_sio_irq);
+  //irq_set_priority (SIO_IRQ_PROC0, PICO_DEFAULT_IRQ_PRIORITY);
   irq_set_enabled(SIO_IRQ_PROC0,true);  
 #endif  
   // main loop
@@ -1506,7 +1549,7 @@ int main()
             input_chr = input_cmd[input_pt] & 0x7f;
             if (input_chr != 0) 
             {
-              pet_kdown( input_chr);
+              pet_kdown( input_chr, false, false);
               //printf("d %d\n", input_chr);
             }  
           }
@@ -1536,7 +1579,7 @@ int main()
           {
             if (input_chr != 0) 
             {
-              pet_kdown( input_chr);
+              pet_kdown( input_chr, false, false);
             }  
           }
           else if (slowdown == 2)
