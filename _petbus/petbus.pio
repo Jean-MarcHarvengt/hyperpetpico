@@ -93,7 +93,6 @@ wait_loop:
     pull                              ; pull 32bit in OSR (block till something there)
     mov X, OSR                        ; save OSR in X for later
     jmp !X,wait_loop                  ; 0 means read not for us (not in pico read memory map)
-    
     irq set 6                         ; block main sm
     set PINS, 0b1 side 0              ; enable DATADIR (now outputing data), now we are 200ns before falling edge
     mov OSR, ~NULL                    ; change data pins as outputs 

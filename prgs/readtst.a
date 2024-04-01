@@ -117,11 +117,12 @@ NB_SPRITES_TOTAL        = 96
 *= $0800
 
 
-        sei
+        ;sei
+        ldy #$0
 wait1
 
+        lda $a000,y ;REG_TILEMAP_L0
         ldx #$00                ; clear screen L1 (text)
-        lda REG_TILEMAP_L0
 clr_l1:
         sta REG_TEXTMAP_L1,x
         sta REG_TEXTMAP_L1+$100,x
@@ -132,9 +133,14 @@ clr_l1:
         bne clr_l1
 
         jsr $FFE4               ; Calling KERNAL GETIN 
-        beq wait1
-
-        cli
+        cmp #$20                ; space to exit else restart
+        beq exit
+        cmp #$31                ; space to exit else restart
+        bne wait1
+        iny
+        jmp wait1
+exit:
+        ;cli
         rts
 
 
