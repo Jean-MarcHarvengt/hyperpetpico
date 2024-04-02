@@ -225,10 +225,12 @@
 #define VCURTAIN_8        ( 0x20 )  
 #define VCURTAIN_16       ( 0x20 + 0x40 )  
 
+extern unsigned char mem[0x2000];
 #ifdef HAS_PETIO
 extern void petbus_init(void (*mem_write_callback)(uint16_t address, uint8_t value));
-extern void petbus_poll_loop(void (*reset_callback)(void));
-
+extern void petbus_loop(void);
+extern bool petbus_poll_reset(void);
+extern void petbus_clear_reset(void);
 #endif
 
 #endif

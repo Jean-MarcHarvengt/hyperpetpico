@@ -136,10 +136,8 @@ static bool font_lowercase = false;
 // Tile definition
 static ALIGNED u8 TileData[TILE_MAXDATA];
 
-// PET shadow memory 8000-9fff
-unsigned char mem[0x2000];
+// Reset
 static bool pet_reset = false;
-
 
 // ****************************************
 // Audio code
@@ -147,8 +145,12 @@ static bool pet_reset = false;
 static AudioPlaySID playSID;
 static u8 prev_sid_reg[26];
 
-void __not_in_flash("AudioRender") AudioRender(void)
+// This is called at 31.7KHz => 31777 times per sec
+void __not_in_flash("LineCall") LineCall(void)
 {
+#ifdef HAS_PETIO
+  pet_reset = petbus_poll_reset();
+#endif  
 #ifdef AUDIO_CBACK
   pwm_audio_handle_sample();
 #endif
@@ -1495,7 +1497,7 @@ int main()
 
 #ifdef HAS_PETIO
   // main loop
-  petbus_poll_loop(SystemReset);
+  petbus_loop();
   /*
   while (true)
   {
@@ -1605,6 +1607,13 @@ int main()
 void Core1Call(void) {
     pwm_audio_handle_buffer();
     handleCmdQueue();
+#ifdef HAS_PETIO
+    if (pet_reset) {
+      pet_reset = false;
+      petbus_clear_reset();
+      SystemReset();
+    }     
+#endif
 } 
 
 

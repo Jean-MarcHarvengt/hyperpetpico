@@ -67,7 +67,7 @@ extern void VideoRenderLineBG(u8 * linebuffer, int scanline);
 extern void VideoRenderLineL0(u8 * linebuffer, int scanline);
 extern void VideoRenderLineL1(u8 * linebuffer, int scanline);
 extern void VideoRenderUpdate(void);
-extern void AudioRender(void);
+extern void LineCall(void);
 extern void Core1Call(void);
 
 // VGA DMA handler - called on end of every scanline
@@ -84,7 +84,7 @@ extern "C" void __not_in_flash_func(VgaLine)()
 	// save integer divider state
 	hw_divider_save_state(&DividerState);
     
-    AudioRender();
+    LineCall();
 	// increment scanline
 	int line = ScanLine;	// current scanline
 	line++; 		// new current scanline
