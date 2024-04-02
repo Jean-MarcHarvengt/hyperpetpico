@@ -26,17 +26,17 @@ unsigned char mem[0x2000];
 #define CONFIG_PIN_PETBUS_READCTRL 27
 #define CONFIG_PIN_PETBUS_RESET 22
 
-//#define VALID_CYCLE ((1 << CONFIG_PIN_PETBUS_PHI2) | (1 << CONFIG_PIN_PETBUS_RESET))
+#define VALID_CYCLE ((1 << CONFIG_PIN_PETBUS_PHI2) | (1 << CONFIG_PIN_PETBUS_RESET))
 
 const PIO pio = pio1;
 const uint sm = 0;
 const uint smread = 1;
 static void (*mem_write)(uint16_t address, uint8_t value) = nullptr;
 
-#define RESET_TRESHOLD 2000
+#define RESET_TRESHOLD 15000
 static uint32_t reset_counter = 0;
-static bool prev_reset_state = true;
 static bool got_reset = false;
+
 
 #ifdef PETIO_EDIT
 static unsigned char mem_9000[0x0800];
@@ -95,8 +95,8 @@ void __noinline __time_critical_func(petbus_loop)(void) {
     __dmb();
 //  __wfi();
 #else
-    //uint32_t allgpios = sio_hw->gpio_in; 
-    //if ((allgpios & VALID_CYCLE) == VALID_CYCLE) {
+    uint32_t allgpios = sio_hw->gpio_in; 
+    if ((allgpios & VALID_CYCLE) == VALID_CYCLE) {
       uint32_t value = pio_sm_get_blocking(pio, sm);
       const bool is_write = ((value & (1u << (CONFIG_PIN_PETBUS_RW - CONFIG_PIN_PETBUS_DATA_BASE))) == 0);
       uint16_t address = (value >> 9) & 0xffff;      
@@ -117,16 +117,17 @@ void __noinline __time_critical_func(petbus_loop)(void) {
       }
       else {
         value = 0;
+#ifdef PETIO_A000        
+        if ( ( address >= 0xa000) && ( address < 0xb000) ) 
+        {
+          value = 0x100 | mem_a000[address-0xa000];
+        }
+        else  
+#endif 
         if ( ( address >= 0x9000) && ( address < 0xa000) ) 
         {
           value = 0x100 | mem[address-0x9000+0x1000];
         }
-#ifdef PETIO_A000        
-        else if ( ( address >= 0xa000) && ( address < 0xb000) ) 
-        {
-          value = 0x100 | mem_a000[address-0xa000];
-        } 
-#endif 
 #ifdef PETIO_EDIT        
         else if ( ( address >= 0xe000) && ( address < 0xe800) ) 
         {
@@ -135,10 +136,10 @@ void __noinline __time_critical_func(petbus_loop)(void) {
 #endif        
         pio1->txf[smread] = value;     
       }      
-    //}
-    //else {
-    //  pio_sm_drain_tx_fifo(pio,smread);
-    //}
+    }
+    else {
+      pio_sm_drain_tx_fifo(pio,smread);
+    }
 #endif
   }
 }
@@ -151,6 +152,7 @@ void petbus_init(void (*mem_write_callback)(uint16_t address, uint8_t value))
   mem_write = mem_write_callback;
 
 #ifdef PETIO_A000
+  
     memcpy((void *)&mem_a000[0], (void *)&rom_a000[0], 0x1000);
 #endif  
 #ifdef PETIO_EDIT
@@ -245,32 +247,35 @@ void petbus_init(void (*mem_write_callback)(uint16_t address, uint8_t value))
   pio_sm_clear_fifos(pio,smread);
 }
 
+
 /********************************
  * Check for reset
 ********************************/ 
 extern bool petbus_poll_reset(void)
 {  
+  bool retval = false;
   // low is reset => true
   bool reset_state = !(sio_hw->gpio_in & (1 << CONFIG_PIN_PETBUS_RESET));
-  // going low
-  if ( (reset_state) && (!prev_reset_state) ) {
+  if (reset_state) {
     if (!got_reset) {
       if (reset_counter < RESET_TRESHOLD) {
         reset_counter++;
+        mem[0] = mem[0] + 1; 
       }
       else {
         got_reset = true;
-        reset_counter = 0;
+        retval = true;
       }
     }
-  }  
+  }
   else {
-    reset_counter = 0;
-  } 
-  return got_reset;
+    got_reset = false;
+    reset_counter = 0;    
+  }
+  return retval;
 }
 
-extern void petbus_clear_reset(void)
+extern void petbus_reset(void)
 {
  #ifdef PETIO_EDIT        
   if (edit80) {
@@ -280,7 +285,6 @@ extern void petbus_clear_reset(void)
     memcpy((void *)&mem_9000[0], (void *)&edit4[0], 0x800);
   }
 #endif 
-  got_reset = false;
 }
 
 #endif

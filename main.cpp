@@ -149,7 +149,10 @@ static u8 prev_sid_reg[26];
 void __not_in_flash("LineCall") LineCall(void)
 {
 #ifdef HAS_PETIO
-  pet_reset = petbus_poll_reset();
+  if ( (!pet_reset) && (petbus_poll_reset()) )
+  {
+    pet_reset = true;
+  }
 #endif  
 #ifdef AUDIO_CBACK
   pwm_audio_handle_sample();
@@ -1610,7 +1613,7 @@ void Core1Call(void) {
 #ifdef HAS_PETIO
     if (pet_reset) {
       pet_reset = false;
-      petbus_clear_reset();
+      petbus_reset();
       SystemReset();
     }     
 #endif

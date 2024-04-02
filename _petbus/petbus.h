@@ -230,7 +230,7 @@ extern unsigned char mem[0x2000];
 extern void petbus_init(void (*mem_write_callback)(uint16_t address, uint8_t value));
 extern void petbus_loop(void);
 extern bool petbus_poll_reset(void);
-extern void petbus_clear_reset(void);
+extern void petbus_reset(void);
 #endif
 
 #endif
