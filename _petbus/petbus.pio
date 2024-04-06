@@ -56,9 +56,9 @@ next_bus_cycle:
     set PINS, 0b011                     ; enable AddrHi tranceiver (PHI2 just felt before wrapping)
     wait 1 GPIO, PHI2_GPIO              ; wait for PHI2 to rise
     in PINS, 8                          ; read AddrHi[7:0]
-    set PINS, 0b101  [12]               ; enable AddrLo tranceiver + wait 12*4ns
+    set PINS, 0b101  [14]               ; enable AddrLo tranceiver + wait 12*4ns
     in PINS, 8                          ; read AddrLo[7:0]
-    set PINS, 0b110  [12]               ; enable Data tranceiver + wait 12*4ns
+    set PINS, 0b110  [14]               ; enable Data tranceiver + wait 12*4ns
     jmp PIN, read_cycle                 ; jump based on the state of the R/W pin (1=read)
 
 write_cycle:
@@ -96,8 +96,8 @@ wait_loop:
     irq set 6                         ; block main sm
     set PINS, 0b1 side 0              ; enable DATADIR (now outputing data), now we are 200ns before falling edge
     mov OSR, ~NULL                    ; change data pins as outputs 
-    out PINDIRS, 8 [6] 
-    mov OSR, X [6]                    ; output data lowest 8 bits (12*4ns later)
+    out PINDIRS, 8  
+    mov OSR, X                    ; output data lowest 8 bits (12*4ns later)
     out PINS, 8 
 
     wait 0 GPIO, PHI2_GPIO [7]        ; wait for PHI0 to fall 

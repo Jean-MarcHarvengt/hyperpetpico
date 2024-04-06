@@ -59,20 +59,45 @@ int processFile(char * infile, char * outfile, char * arrname)
 
 int main(int argc, char *argv[]) {
 
-
-  if (processFile("edit-4-80-b-60Hz.901474-03.bin","edit480.h","edit480") < 0)
+/*
+  if (processFile("pet_e000_roms/edit-4-80-b-60Hz.901474-03.bin","edit480.h","edit480") < 0)
     return (-1);
 
-  if (processFile("edit-4-40-b-60Hz.ts.bin","edit4.h","edit4") < 0)
+  if (processFile("pet_e000_roms/edit-4-40-b-60Hz.ts.bin","edit4.h","edit4") < 0)
     return (-1);
 
-  if (processFile("edit-4-80-b-50Hz.901474-04-0283.bin","edit48050.h","edit480") < 0)
+  if (processFile("pet_e000_roms/edit-4-80-b-50Hz.901474-04-0283.bin","edit48050.h","edit480") < 0)
     return (-1);
 
-  if (processFile("edit-4-40-b-50Hz.ts.bin","edit450.h","edit4") < 0)
+  if (processFile("pet_e000_roms/edit-4-40-b-50Hz.ts.bin","edit450.h","edit4") < 0)
     return (-1);
 
-  if (processFile("vsyncbin.bin","rom_a000.h","rom_a000") < 0)
+  if (processFile("pet_a000_roms/vsync.bin","vsync.h","vsyncpet") < 0)
+    return (-1);
+
+
+  if (processFile("pet_a000_roms/jinsam8-rom-a000_database.bin","jinsam8-rom-a000_database.h","jinsam8") < 0)
+    return (-1);
+  if (processFile("pet_a000_roms/kram2.0-rom-a000.bin","kram2.0-rom-a000.h","kram20") < 0)
+    return (-1);
+  if (processFile("pet_a000_roms/micromon80-ud11-a000.bin","micromon80-ud11-a000.h","micromon80") < 0)
+    return (-1);
+  if (processFile("pet_a000_roms/orga_basic101-a000.bin","orga_basic101-a000.h","orga_basic101") < 0)
+    return (-1);
+  if (processFile("pet_a000_roms/pal_assembler_a000.bin","pal_assembler_a000.h","pal_assembler") < 0)
+    return (-1);
+  if (processFile("pet_a000_roms/pascal3.0_rom-a000.bin","pascal3.0_rom-a000.h","pascal30") < 0)
+    return (-1);
+  if (processFile("pet_a000_roms/power_basic_8032_a000.bin","power_basic_8032_a000.h","power_basic_8032") < 0)
+    return (-1);
+  if (processFile("pet_a000_roms/toolkit4.0_rom-a000.bin","toolkit4.0_rom-a000.h","toolkit40") < 0)
+    return (-1);
+  if (processFile("pet_a000_roms/wedge.bin","wedge.h","wedge") < 0)
+    return (-1);
+  if (processFile("pet_a000_roms/wordpro3-rom-a000.bin","wordpro3-rom-a000.h","wordpro3") < 0)
+    return (-1);
+*/
+  if (processFile("menuloader.bin","menuloader-9000.h","menuloader") < 0)
     return (-1);
 
 /*

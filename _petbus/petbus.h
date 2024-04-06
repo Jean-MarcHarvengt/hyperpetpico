@@ -226,6 +226,9 @@
 #define VCURTAIN_16       ( 0x20 + 0x40 )  
 
 extern unsigned char mem[0x2000];
+#ifdef PETIO_A000
+extern unsigned char mem_a000[0x1000];
+#endif
 #ifdef HAS_PETIO
 extern void petbus_init(void (*mem_write_callback)(uint16_t address, uint8_t value));
 extern void petbus_loop(void);

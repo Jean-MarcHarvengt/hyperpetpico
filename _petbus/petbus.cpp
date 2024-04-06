@@ -8,13 +8,14 @@
 #include "edit450.h"
 #include "edit48050.h"
 #endif
-#ifdef PETIO_A000
-#include "rom_a000.h"
-#endif
 #endif
 
 // PET shadow memory 8000-9fff
 unsigned char mem[0x2000];
+// PET shadow memory a000-afff
+#ifdef PETIO_A000
+unsigned char mem_a000[0x1000];
+#endif
 
 #ifdef HAS_PETIO
 // Petbus PIO config
@@ -37,14 +38,11 @@ static void (*mem_write)(uint16_t address, uint8_t value) = nullptr;
 static uint32_t reset_counter = 0;
 static bool got_reset = false;
 
-
 #ifdef PETIO_EDIT
 static unsigned char mem_9000[0x0800];
 static bool edit80 = true;
 #endif
-#ifdef PETIO_A000
-static unsigned char mem_a000[0x1000];
-#endif
+
 
 /********************************
  * petio PIO IRQ
@@ -53,7 +51,7 @@ static unsigned char mem_a000[0x1000];
 static void __not_in_flash("rx_irq") rx_irq(void) {
   if(!pio_sm_is_rx_fifo_empty(pio, sm)) 
   {
-    uint32_t value = pio_sm_get(pio, sm);
+    uint32_t value = pio_sm_get_blocking(pio, sm);
     const bool is_write = ((value & (1u << (CONFIG_PIN_PETBUS_RW - CONFIG_PIN_PETBUS_DATA_BASE))) == 0);
     uint16_t address = (value >> 9) & 0xffff;      
     if (is_write)
@@ -72,6 +70,13 @@ static void __not_in_flash("rx_irq") rx_irq(void) {
     }
     else {
       value = 0;
+#ifdef PETIO_A000 
+      if ( ( address >= 0xa000) && ( address < 0xb000) ) 
+      {
+        value = 0x100 | mem_a000[address-0xa000];
+      }
+      else
+#endif
       if ( ( address >= 0x9000) && ( address < 0xa000) ) 
       {
         value = 0x100 | mem[address-0x9000+0x1000];
@@ -150,11 +155,7 @@ void __noinline __time_critical_func(petbus_loop)(void) {
 void petbus_init(void (*mem_write_callback)(uint16_t address, uint8_t value))
 { 
   mem_write = mem_write_callback;
-
-#ifdef PETIO_A000
-  
-    memcpy((void *)&mem_a000[0], (void *)&rom_a000[0], 0x1000);
-#endif  
+ 
 #ifdef PETIO_EDIT
   if (edit80) {
     memcpy((void *)&mem_9000[0], (void *)&edit480[0], 0x800);
@@ -234,14 +235,42 @@ void petbus_init(void (*mem_write_callback)(uint16_t address, uint8_t value))
   }
 
   // Enable interrupt
+  irq_set_priority (pio_irq, PICO_DEFAULT_IRQ_PRIORITY-8);  
   irq_add_shared_handler(pio_irq, rx_irq, 1); // Add a shared IRQ handler
+//  irq_set_exclusive_handler(pio_irq, rx_irq); // Add a shared IRQ handler
   irq_set_enabled(pio_irq, true); // Enable the IRQ
   const uint irq_index = pio_irq - ((pio == pio0) ? PIO0_IRQ_0 : PIO1_IRQ_0); // Get index of the IRQ
   pio_set_irqn_source_enabled(pio, irq_index, (pio_interrupt_source)(pis_sm0_rx_fifo_not_empty + sm), true); // Set pio to tell us when the FIFO is NOT empty
   //pio_set_irqn_source_enabled(pio, irq_index, (pio_interrupt_source)(pis_interrupt0 + sm), true);
   pio_sm_set_enabled(pio, sm, true);
 #endif
-
+/*
+  irq_set_enabled(TIMER_IRQ_0, false);
+  irq_set_enabled(TIMER_IRQ_1, false);
+  irq_set_enabled(TIMER_IRQ_2, false);
+  irq_set_enabled(TIMER_IRQ_3, false);
+  irq_set_enabled(PWM_IRQ_WRAP, false);
+  irq_set_enabled(USBCTRL_IRQ, false);
+  irq_set_enabled(XIP_IRQ, false);
+  irq_set_enabled(PIO0_IRQ_0, false);
+  irq_set_enabled(PIO0_IRQ_1, false);
+  irq_set_enabled(PIO1_IRQ_0, false);
+  irq_set_enabled(PIO1_IRQ_1, false);
+  irq_set_enabled(DMA_IRQ_0, false);
+  irq_set_enabled(DMA_IRQ_1, false);
+  irq_set_enabled(IO_IRQ_BANK0, false);
+  irq_set_enabled(IO_IRQ_QSPI , false);
+  irq_set_enabled(SIO_IRQ_PROC0, false);
+  irq_set_enabled(SIO_IRQ_PROC1, false);
+  irq_set_enabled(CLOCKS_IRQ  , false);
+  irq_set_enabled(SPI0_IRQ  , false);
+  irq_set_enabled(SPI1_IRQ  , false);
+  irq_set_enabled(UART0_IRQ , false);
+  irq_set_enabled(UART1_IRQ , false);
+  irq_set_enabled(I2C0_IRQ, false);
+  irq_set_enabled(I2C1_IRQ, false);
+  irq_set_enabled(RTC_IRQ, false);
+*/
   pio_enable_sm_mask_in_sync(pio, (1 << sm) | (1 << smread));
   pio_sm_clear_fifos(pio,sm);
   pio_sm_clear_fifos(pio,smread);
@@ -270,7 +299,7 @@ extern bool petbus_poll_reset(void)
   }
   else {
     got_reset = false;
-    reset_counter = 0;    
+    reset_counter = 0;
   }
   return retval;
 }

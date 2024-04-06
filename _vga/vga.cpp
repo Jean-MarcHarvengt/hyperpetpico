@@ -275,7 +275,7 @@ void VgaDmaInit()
 	irq_set_exclusive_handler(DMA_IRQ_0, VgaLine);
 
 	// set highest IRQ priority
-	irq_set_priority(DMA_IRQ_0, 0);
+	//irq_set_priority(DMA_IRQ_0, 0);
 }
 
 // initialize VGA PIO

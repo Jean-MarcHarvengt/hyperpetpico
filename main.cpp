@@ -17,6 +17,20 @@
 #include "edit4.h"
 #include "edit480.h"
 #include "kernal4.h"
+#ifdef PETIO_A000
+#include "vsync.h"
+#include "wedge.h"
+#include "jinsam8-rom-a000_database.h"
+#include "kram2.0-rom-a000.h"
+#include "micromon80-ud11-a000.h"
+#include "orga_basic101-a000.h"
+#include "pal_assembler_a000.h"
+#include "pascal3.0_rom-a000.h"
+#include "power_basic_8032_a000.h"
+#include "toolkit4.0_rom-a000.h"
+#include "wordpro3-rom-a000.h"
+#include "menuloader-9000.h"
+#endif
 #ifdef HAS_NETWORK
 #include "lwip/apps/tftp_server.h"
 #include "network.h"
@@ -28,6 +42,22 @@ extern "C" void cdc_task(void);
 extern "C" void hid_app_task(void);
 #endif
 #include "decrunch.h"
+
+
+#ifdef PETIO_A000
+static const unsigned char * a000_rom_list[] = {
+  vsync,
+  jinsam8,
+  kram20,
+  micromon80,
+  orga_basic101,
+  pal_assembler,
+  pascal30,
+  power_basic_8032,
+  toolkit40,
+  wordpro3
+};  
+#endif         
 
 // Graphics
 #define VGA_RGB(r,g,b)   ( (((r>>5)&0x07)<<5) | (((g>>5)&0x07)<<2) | (((b>>6)&0x3)<<0) )
@@ -232,25 +262,6 @@ static void VideoInit(u8 mode, bool firstTime)
 }
 
 
-static void VideoInit0(void) {
-  VideoInit(0, false);
-} 
-
-static void VideoInit1(void) {
-  VideoInit(1, false);
-} 
-
-static void VideoInit2(void) {
-  VideoInit(2, false);
-} 
-
-static void VideoInitNew(u8 mode)
-{
-  if (mode == 0) Core1Exec(VideoInit0);  
-  else if (mode == 1) Core1Exec(VideoInit1); 
-  else Core1Exec(VideoInit2);  
-} 
-
 static void VideoSetup(void)
 {
   // setup videomode
@@ -295,7 +306,6 @@ void __not_in_flash("VideoRenderUpdate") VideoRenderUpdate(void)
       if (vmode == 0) VideoInit(0, false);  
       else if (vmode == 1) VideoInit(1, false); 
       else VideoInit(2, false);
-      //VideoInitNew(vmode);
     }
 
     // sort sprites by Y, max amount sprites per scanline
@@ -563,8 +573,11 @@ void __not_in_flash("VideoRenderLineL1") VideoRenderLineL1(u8 * linebuffer, int 
 static void VideoRenderInit(void)
 {
   // initialize shared memory
-  memset((void*)&mem[0x0000], 0, 0x1800); // text/tilemap
-  memset((void*)&mem[0x1800], 0, 0x0800);  // the rest
+  memset((void*)&mem[0x0000], 0, 0x2000); // text/tilemap...
+#ifdef PETIO_A000
+  // sys 36864 / sys 40960
+  memcpy((void *)&mem[0x1000], (void *)&menuloader[0], sizeof(menuloader));
+#endif 
   // initialize GFX memory
   ResetGFXMem();  
 
@@ -633,6 +646,14 @@ static void VideoRenderInit(void)
 #endif
 }
 
+static void AudioRenderInit(void)
+{
+  //31500/60=525,31500/50=630 samples per frame
+  //22050/60=367,22050/50=441 samples per frame
+  pwm_audio_init(2048, audio_fill_buffer);
+  playSID.begin(SOUNDRATE, 1024); 
+}
+
 static void SystemReset(void)
 {  
   VideoRenderInit();
@@ -642,7 +663,7 @@ static void SystemReset(void)
 // ****************************************
 // PET memory access IRQ
 // ****************************************
-#define MAX_CMD 16
+#define MAX_CMD 32
 #define MAX_PAR 8
 
 static uint8_t tra_params[MAX_PAR];
@@ -691,6 +712,7 @@ typedef enum {
   cmd_bitmap_point=13,
   cmd_bitmap_rect=14, 
   cmd_bitmap_tri=15,
+  cmd_a000_bank=31,
 } Cmd;
 
 static void handleCmdQueue(void) {
@@ -712,6 +734,11 @@ static void handleCmdQueue(void) {
       case cmd_bitmap_clr:
         memset((void*)&Bitmap[0],0, sizeof(Bitmap));
         break;
+      case cmd_a000_bank:
+#ifdef PETIO_A000
+        memcpy((void *)&mem_a000[0], (void *)a000_rom_list[cmd.p8_1], 0x1000);
+#endif
+        break;        
       default:
         break;
     }  
@@ -744,7 +771,9 @@ static const uint8_t cmd_params_len[MAX_CMD]={
 //       13: bitmap point
 //       14: bitmap tri
 //       15: bitmap rect
-  0,3,3,6,4,4,2,2,2, 0,0,0, 0,0,0,0
+//       31  a000_bank                (data=bank#)
+ 
+  0,3,3,6,4,4,2,2,2, 0,0,0, 0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
 }; 
 
 static void traParamFuncDummy(void){
@@ -825,6 +854,12 @@ static void traParamFuncExecuteCommand(void){
     case cmd_transfer_packed_bitmap_data:
       pushCmdQueue({cmd_unpack_bitmap});
       break;
+    case cmd_bitmap_clr:
+      pushCmdQueue({cmd_bitmap_clr});
+      break;      
+    case cmd_a000_bank:
+      pushCmdQueue({cmd_a000_bank,tra_params[0]});
+      break;
   }
 }
 
@@ -843,6 +878,22 @@ static void (*traParamFuncPtr[MAX_CMD])(void) = {
   traParamFuncDummy,
   traParamFuncDummy,
   
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
   traParamFuncExecuteCommand,
   traParamFuncExecuteCommand,
   traParamFuncExecuteCommand,
@@ -923,6 +974,22 @@ static void (*traDataFuncPtr[])(uint8_t) = {
   traDataFunc8nolut, // 13
   traDataFunc8nolut, // 14
   traDataFunc8nolut, // 15
+  traDataFunc8nolut, // 16
+  traDataFunc8nolut, // 17
+  traDataFunc8nolut, // 18
+  traDataFunc8nolut, // 19
+  traDataFunc8nolut, // 20
+  traDataFunc8nolut, // 21
+  traDataFunc8nolut, // 22
+  traDataFunc8nolut, // 23
+  traDataFunc8nolut, // 24
+  traDataFunc8nolut, // 25
+  traDataFunc8nolut, // 26
+  traDataFunc8nolut, // 27
+  traDataFunc8nolut, // 28
+  traDataFunc8nolut, // 29
+  traDataFunc8nolut, // 30
+  traDataFunc8nolut  // 31
 };
 
 static void handle_custom_registers(uint16_t address, uint8_t value) 
@@ -956,7 +1023,7 @@ static void handle_custom_registers(uint16_t address, uint8_t value)
               break;
             case cmd_transfer_packed_bitmap_data:
               pushCmdQueue({cmd_unpack_bitmap});
-              break;
+              break;  
           }
         }  
       }   
@@ -1067,7 +1134,11 @@ uint8_t readWord( uint16_t location)
     return mem[location-0x8000];
   }  
   else if (location < 0xb000) {
+#ifdef PETIO_A000
+    return mem_a000[location-0xa000];
+#else
     return 0;
+#endif    
   }  
   else if (location < 0xc000) {
     return basic4_b000[location-0xb000];
@@ -1109,6 +1180,11 @@ void writeWord( uint16_t location, uint8_t value)
     mem[location-0x8000] = value;
     handle_custom_registers(location, value);
   }
+#ifdef PETIO_A000
+  else if (location < 0xb000) {
+    mem_a000[location-0xa000] = value;
+  }
+#endif
   else if ( (location > 0xe800) && (location < 0xf000) ) {
     if (location == 0xe812)       // PORT B
     {
@@ -1297,7 +1373,12 @@ static void __not_in_flash("pet_mem_write") pet_mem_write(uint16_t address, uint
   if ( address < 0xa000) {
     mem[address-0x8000] = value;
     handle_custom_registers(address, value);
-  } 
+  }
+#ifdef PETIO_A000
+  else if ( address < 0xb000) {
+    mem_a000[address-0xa000] = value;
+  }  
+#endif
 }
 #endif
 
@@ -1493,10 +1574,12 @@ int main()
 #ifndef HAS_PETIO
   printf("Init Audio...\n");
 #endif
-  //31500/60=525,31500/50=630 samples per frame
-  //22050/60=367,22050/50=441 samples per frame
-  pwm_audio_init(2048, audio_fill_buffer);
-  playSID.begin(SOUNDRATE, 1024);
+  Core1Exec(AudioRenderInit);
+  //AudioRenderInit();
+
+#ifdef PETIO_A000
+  memcpy((void *)&mem_a000[0], (void *)&vsync[0], 0x1000);
+#endif 
 
 #ifdef HAS_PETIO
   // main loop
