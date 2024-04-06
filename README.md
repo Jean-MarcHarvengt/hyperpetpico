@@ -14,7 +14,7 @@ At this point of time, the hyperpetpico project supports:<br>
 * dual layers: 2 tiles layers or tiles+text with smooth scrolling
 * 320x200 bitmap mode (256 colors) on the lower layer
 * background color/raster colors
-* extra 4K RAM in $a000 (so far 1 bank by may be more one day!)
+* extra 4K RAM in $a000 (so far 1 bank, may be more in future!)
 * pluggable ROM in $a000 via resident menu loader (sys36864 +sys40960) 
 * [No storage is offered!]
 
