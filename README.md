@@ -1,6 +1,6 @@
 # hyperpetpico for PET 4032/8032
 The commodore PET is the father of all personal computers.<br>
-The model 8032 remains a impressive machine (great keyboard, 80 colums, 32K RAM...)<br>
+The model 8032 remains a impressive machine (professional keyboard, 80 colums, 32K RAM...)<br>
 <br>
 Today the PET deserves a modern hardware expansion board!<br>
 This project intents to upgrade the PET to a modern 6502 computer.<br>
@@ -14,7 +14,8 @@ At this point of time, the hyperpetpico project supports:<br>
 * dual layers: 2 tiles layers or tiles+text with smooth scrolling
 * 320x200 bitmap mode (256 colors) on the lower layer
 * background color/raster colors
-* [RAM remains as original (4 to 32K)!]
+* extra 4K RAM in $a000 (so far 1 bank by may be more one day!)
+* pluggable ROM in $a000 via resident menu loader (sys36864 +sys40960) 
 * [No storage is offered!]
 
 <br>
@@ -28,7 +29,10 @@ The hyperperpico exists as 2 modules<br>
 The picture on the PET monitor is mirrored to VGA by default.<br>
 Programs can be loaded (via tape emulation, or modern devices as PETdisk or PETdisk MAX 2)<br>
 As soon a program make uses of extended graphics capabilities, only VGA is usable<br>
-The rest of the PET hardware is just used for its CPU,RAM,ROM,keyboard,PIA,VIA ...
+The rest of the PET hardware is just used for its CPU,RAM,ROM,keyboard,PIA,VIA ...<br>
+New registers are available through 9000-9fff region (R/W)<br>
+Region a000-afff is available as extra RAM or to store custom roms.
+
 <br>
 
 To ease development, the second module can be used as a standalone PET emulator<br>
