@@ -17,6 +17,18 @@
 #include "edit4.h"
 #include "edit480.h"
 #include "kernal4.h"
+#ifdef HAS_NETWORK
+#include "lwip/apps/tftp_server.h"
+#include "network.h"
+#endif
+#include "bsp/board.h"
+#include "tusb.h"
+#include "kbd.h"
+extern "C" void cdc_task(void);
+extern "C" void hid_app_task(void);
+#endif
+#include "decrunch.h"
+
 #ifdef PETIO_A000
 #include "vsync.h"
 #include "wedge.h"
@@ -30,21 +42,7 @@
 #include "toolkit4.0_rom-a000.h"
 #include "wordpro3-rom-a000.h"
 #include "menuloader-9000.h"
-#endif
-#ifdef HAS_NETWORK
-#include "lwip/apps/tftp_server.h"
-#include "network.h"
-#endif
-#include "bsp/board.h"
-#include "tusb.h"
-#include "kbd.h"
-extern "C" void cdc_task(void);
-extern "C" void hid_app_task(void);
-#endif
-#include "decrunch.h"
 
-
-#ifdef PETIO_A000
 static const unsigned char * a000_rom_list[] = {
   vsync,
   jinsam8,

@@ -43,6 +43,44 @@ static unsigned char mem_9000[0x0800];
 static bool edit80 = true;
 #endif
 
+/********************************
+ * petio PIO read table
+********************************/ 
+static void __not_in_flash("readNone") readNone(uint32_t address) {
+  pio1->txf[smread] = 0;
+}
+
+static void __not_in_flash("read8000") read8000(uint32_t address) {
+  pio1->txf[smread] = 0x100 | mem[address-0x8000];
+}
+
+static void __not_in_flash("read9000") read9000(uint32_t address) {
+  pio1->txf[smread] = 0x100 | mem[address-0x8000];
+}
+
+static void __not_in_flash("readA000") readA000(uint32_t address) {
+  pio1->txf[smread] = 0x100 | mem_a000[address-0xa000];
+}
+
+static void (*readFuncTable[])(uint32_t) = {
+  readNone, // 0
+  readNone, // 1
+  readNone, // 2 
+  readNone, // 3
+  readNone, // 4
+  readNone, // 5
+  readNone, // 6
+  readNone, // 7
+  read8000, // 8
+  read9000, // 9
+  readA000, // a
+  readNone, // b
+  readNone, // c
+  readNone, // d
+  readNone, // e
+  readNone, // f
+};
+
 
 /********************************
  * petio PIO IRQ
@@ -94,6 +132,7 @@ static void __not_in_flash("rx_irq") rx_irq(void) {
 #endif
 
 
+
 void __noinline __time_critical_func(petbus_loop)(void) {
   for(;;) {
 #ifdef PETIO_IRQ
@@ -121,6 +160,9 @@ void __noinline __time_critical_func(petbus_loop)(void) {
         pio_sm_drain_tx_fifo(pio,smread);
       }
       else {
+        void (*readFunc)(uint32_t) = readFuncTable[address>>12];
+        readFunc(address);
+/*        
         value = 0;
 #ifdef PETIO_A000        
         if ( ( address >= 0xa000) && ( address < 0xb000) ) 
@@ -138,8 +180,9 @@ void __noinline __time_critical_func(petbus_loop)(void) {
         {
           value = 0x100 | mem_9000[address-0xe000];
         } 
-#endif        
-        pio1->txf[smread] = value;     
+#endif
+        pio1->txf[smread] = value;
+*/        
       }      
     }
     else {
