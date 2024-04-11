@@ -42,6 +42,7 @@ extern "C" void hid_app_task(void);
 #include "toolkit4.0_rom-a000.h"
 #include "wordpro3-rom-a000.h"
 #include "menuloader-9000.h"
+#include "menuloader2-9000.h"
 
 static const unsigned char * a000_rom_list[] = {
   vsync,
@@ -154,12 +155,8 @@ static SprYSortedItem SpriteYSorted[256];
 static u8 SprYSortedIndexes[256];
 static u8 SprYSortedIds[SPRITE_NUM_MAX+1];
 
-
 // Sprite definition
 static ALIGNED u8 SpriteData[SPRITE_SIZE*SPRITE_NBTILES];
-
-// Font definition
-static bool font_lowercase = false;
 
 // Tile definition
 static ALIGNED u8 TileData[TILE_MAXDATA];
@@ -575,6 +572,7 @@ static void VideoRenderInit(void)
 #ifdef PETIO_A000
   // sys 36864 / sys 40960
   memcpy((void *)&mem[0x1000], (void *)&menuloader[0], sizeof(menuloader));
+//  memcpy((void *)&mem[0x1000], (void *)&menuloader2[0], 113);
 #endif 
   // initialize GFX memory
   ResetGFXMem();  
@@ -990,7 +988,8 @@ static void (*traDataFuncPtr[])(uint8_t) = {
   traDataFunc8nolut  // 31
 };
 
-static void handle_custom_registers(uint16_t address, uint8_t value) 
+void __not_in_flash("handle_custom_registers") handle_custom_registers(uint16_t address, uint8_t value)
+//static void handle_custom_registers(uint16_t address, uint8_t value) 
 {
   switch (address-0x8000) 
   {  
@@ -1353,32 +1352,6 @@ void kbd_signal_raw_key (int keycode, int code, int codeshifted, int flags, int 
 }
 #endif
 
-#ifdef HAS_PETIO
-static void __not_in_flash("pet_mem_write") pet_mem_write(uint16_t address, uint8_t value) {
-//static void pet_mem_write(uint16_t address, uint8_t value) {
-  if (address == 0xe84C) 
-  {
-      // e84C 12=LO, 14=HI
-      if (value & 0x02) 
-      {
-        font_lowercase = true;
-      }
-      else 
-      {
-        font_lowercase = false;
-      }
-  }    
-  if ( address < 0xa000) {
-    mem[address-0x8000] = value;
-    handle_custom_registers(address, value);
-  }
-#ifdef PETIO_A000
-  else if ( address < 0xb000) {
-    mem_a000[address-0xa000] = value;
-  }  
-#endif
-}
-#endif
 
 #ifndef HAS_PETIO
 #ifdef HAS_NETWORK
@@ -1540,7 +1513,7 @@ int main()
   stdio_init_all();
 
 #ifdef HAS_PETIO
-  petbus_init(pet_mem_write);  
+  petbus_init();
 #else
 #ifdef HAS_NETWORK 
   printf("Init Wifi...\n");

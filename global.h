@@ -9,7 +9,6 @@
 
 #define PETIO_A000      1     // enable A000-AFFF ROM emulation
 //#define PETIO_EDIT      1     // enable E000-E7FF ROM emulation
-//#define PETIO_IRQ       1     // handle petio from IRQ
 #define EMU_ACCURATE    1     // per line emulation
 
 #define SIXTYHZ         1     // 60Hz mode

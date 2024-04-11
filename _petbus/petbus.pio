@@ -56,9 +56,9 @@ next_bus_cycle:
     set PINS, 0b011                     ; enable AddrHi tranceiver (PHI2 just felt before wrapping)
     wait 1 GPIO, PHI2_GPIO              ; wait for PHI2 to rise
     in PINS, 8                          ; read AddrHi[7:0]
-    set PINS, 0b101  [14]               ; enable AddrLo tranceiver + wait 12*4ns
+    set PINS, 0b101  [10]               ; [14]? enable AddrLo tranceiver + wait 12*4ns
     in PINS, 8                          ; read AddrLo[7:0]
-    set PINS, 0b110  [14]               ; enable Data tranceiver + wait 12*4ns
+    set PINS, 0b110  [10]               ; [14]? enable Data tranceiver + wait 12*4ns
     jmp PIN, read_cycle                 ; jump based on the state of the R/W pin (1=read)
 
 write_cycle:

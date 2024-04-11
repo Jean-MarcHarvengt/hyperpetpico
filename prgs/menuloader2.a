@@ -1,0 +1,195 @@
+!to "menuloader2.bin"
+
+
+REG_TCOMMAND      = $9b11
+; 1: transfer tiles data      (data=tilenr,64/packet pixels)
+; 2: transfer sprites data    (data=spritenr,384/packet pixels)
+; 3: transfer bitmap data     (data=xh,xl,y,wh,wl,h,w*h/packet pixels) 
+; 4: transfer t/fmap col data (data=layer,col,row,size,size/packet tiles)
+; 5: transfer t/fmap row data (data=layer,col,row,size,size/packet tiles)
+REG_TPARAMS       = $9b12
+REG_TDATA         = $9b13
+
+
+ROWLEN  = 80
+
+*= $9000
+
+        sei   
+        ldx #$00                ; clear screen 
+clear:
+        lda #32
+        sta $8000,x
+        sta $8100,x
+        sta $8200,x
+        sta $8300,x
+        dex
+        bne clear
+
+        jsr initlineoffset      ; init offset table
+
+;        lda #<title             ; menu
+;        ldx #>title
+;        ldy #0
+;        jsr print
+;        lda #<text0
+;        ldx #>text0
+;        ldy #2
+;        jsr print
+;        lda #<text1
+;        ldx #>text1
+;        ldy #3
+;        jsr print
+;        lda #<text2
+;        ldx #>text2
+;        ldy #4
+;        jsr print
+;        lda #<text3
+;        ldx #>text3
+;        ldy #5
+;        jsr print
+;        lda #<text4
+;        ldx #>text4
+;        ldy #6
+;        jsr print
+;        lda #<text5
+;        ldx #>text5
+;        ldy #7
+;        jsr print
+;        lda #<text6
+;        ldx #>text6
+;        ldy #8
+;        jsr print
+;        lda #<text7
+;        ldx #>text7
+;        ldy #9
+;        jsr print
+;        lda #<text8
+;        ldx #>text8
+;        ldy #10
+;        jsr print
+;        lda #<text9
+;        ldx #>text9
+;        ldy #11
+;        jsr print
+
+wait1:
+        lda #8                   ; read row 8
+        sta $e810              
+        lda $e812                ; no key pressed!
+        cmp #$ff        
+        beq wait1
+
+        cli
+        rts
+
+
+initlineoffset:
+        lda #$00                ; $8000
+        sta $54
+        lda #$80
+        sta $55
+        ldx #00                 ; line #
+clear11:
+        lda $54                 ; store lo and hi offset
+        sta linelo,x
+        lda $55        
+        sta linehi,x
+        inx
+        cpx #25
+        bne clear11
+        rts
+
+
+
+
+
+;        lda #$00                ; $8000
+;        sta $54
+;        lda #$80
+;        sta $55
+;        ldx #00                 ; line #
+;init1:        
+;        lda $54                 ; store lo and hi offset
+;        sta linelo,x
+;        lda $55
+;        sta linehi,x
+;        clc
+;        lda $54
+;        adc #ROWLEN
+;        sta $54
+;        bcc init2             
+;        inc $55          
+;init2:
+;        inx
+;        cpx #25
+;        bne init1
+;        rts
+
+ 
+;print:    
+;        pha                             ; print TEXT 
+;        lda linelo,y                    ; dst lo
+;        sta addr+1
+;        lda linehi,y                    ; dst hi
+;        sta addr+2
+;        pla
+;        sta $54                         ; src text lo 
+;        txa                             ; src text hi
+;        sta $55
+;        ldy #$00
+;print1
+;        lda ($54),y
+;        beq pr_end
+;        cmp #65                         ; 32
+;        bmi addr
+;        clc
+;        sbc #$3f
+;addr    sta $8000,y
+;        iny
+;        bne print1
+;pr_end
+;        rts
+
+;-------------------------------------------------------------
+linelo:
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+linehi:
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+;title
+;!text "SELECT ROM IN $A000:"
+;!byte 0
+;text0
+;!text "(1) WEDGE"
+;!byte 0
+;text1
+;!text "(2) JINSAM 8"
+;!byte 0
+;text2
+;!text "(3) KRAM 2.0"
+;!byte 0
+;text3
+;!text "(4) MICROMON"
+;!byte 0
+;text4
+;!text "(5) ORGA BASIC 101"
+;!byte 0
+;text5
+;!text "(6) PAL ASSEMBLER"
+;!byte 0
+;text6
+;!text "(7) PASCAL 3.0"
+;!byte 0
+;text7
+;!text "(8) POWER BASIC"
+;!byte 0
+;text8
+;!text "(9) TOOLKIT 4.0"
+;!byte 0
+;text9
+;!text "(0) WORDPRO 3.0"
+;!byte 0
+
+
+

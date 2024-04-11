@@ -16,6 +16,7 @@ unsigned char mem[0x2000];
 #ifdef PETIO_A000
 unsigned char mem_a000[0x1000];
 #endif
+bool font_lowercase = false;
 
 #ifdef HAS_PETIO
 // Petbus PIO config
@@ -32,7 +33,6 @@ unsigned char mem_a000[0x1000];
 const PIO pio = pio1;
 const uint sm = 0;
 const uint smread = 1;
-static void (*mem_write)(uint16_t address, uint8_t value) = nullptr;
 
 #define RESET_TRESHOLD 15000
 static uint32_t reset_counter = 0;
@@ -62,7 +62,9 @@ static void __not_in_flash("readA000") readA000(uint32_t address) {
   pio1->txf[smread] = 0x100 | mem_a000[address-0xa000];
 }
 
-static void (*readFuncTable[])(uint32_t) = {
+static void (*readFuncTable[16])(uint32_t);/*
+ = {
+
   readNone, // 0
   readNone, // 1
   readNone, // 2 
@@ -80,65 +82,16 @@ static void (*readFuncTable[])(uint32_t) = {
   readNone, // e
   readNone, // f
 };
+*/
 
+extern void handle_custom_registers(uint16_t address, uint8_t value);
 
 /********************************
- * petio PIO IRQ
+ * petio loop
 ********************************/ 
-#ifdef PETIO_IRQ
-static void __not_in_flash("rx_irq") rx_irq(void) {
-  if(!pio_sm_is_rx_fifo_empty(pio, sm)) 
-  {
-    uint32_t value = pio_sm_get_blocking(pio, sm);
-    const bool is_write = ((value & (1u << (CONFIG_PIN_PETBUS_RW - CONFIG_PIN_PETBUS_DATA_BASE))) == 0);
-    uint16_t address = (value >> 9) & 0xffff;      
-    if (is_write)
-    {
-#ifdef PETIO_EDIT        
-      if ( address == 0xe000)
-      {
-        edit80 = (value &= 0xff)?false:true;   
-      }
-      else 
-#endif
-      if ( address >= 0x8000) 
-      {
-        mem_write(address, value &= 0xff);
-      }
-    }
-    else {
-      value = 0;
-#ifdef PETIO_A000 
-      if ( ( address >= 0xa000) && ( address < 0xb000) ) 
-      {
-        value = 0x100 | mem_a000[address-0xa000];
-      }
-      else
-#endif
-      if ( ( address >= 0x9000) && ( address < 0xa000) ) 
-      {
-        value = 0x100 | mem[address-0x9000+0x1000];
-      }
-#ifdef PETIO_EDIT        
-      else if ( ( address >= 0xe000) && ( address < 0xe800) ) 
-      {
-        value = 0x100 | mem_9000[address-0xe000];
-      } 
-#endif        
-      pio1->txf[smread] = value;
-    }  
-  }
-}
-#endif
-
-
-
-void __noinline __time_critical_func(petbus_loop)(void) {
+void __not_in_flash("__time_critical_func") petbus_loop(void) {
+//void __noinline __time_critical_func(petbus_loop)(void) {
   for(;;) {
-#ifdef PETIO_IRQ
-    __dmb();
-//  __wfi();
-#else
     uint32_t allgpios = sio_hw->gpio_in; 
     if ((allgpios & VALID_CYCLE) == VALID_CYCLE) {
       uint32_t value = pio_sm_get_blocking(pio, sm);
@@ -146,16 +99,37 @@ void __noinline __time_critical_func(petbus_loop)(void) {
       uint16_t address = (value >> 9) & 0xffff;      
       if (is_write)
       {
-#ifdef PETIO_EDIT        
-        if ( address == 0xe000)
+        if ( address >= 0x8000)
         {
-          edit80 = (value &= 0xff)?false:true;   
-        }
-        else 
+          if ( address < 0xa000)
+          {
+            mem[address-0x8000] = value &= 0xff;
+            //handle_custom_registers(address, value &= 0xff);
+          }
+#ifdef PETIO_A000
+          else if ( address < 0xb000)
+          {
+            mem_a000[address-0xa000] = value &= 0xff;
+          }
 #endif
-        if ( address >= 0x8000) 
-        {
-          mem_write(address, value &= 0xff);
+          else if (address == 0xe84C)
+          {
+              // e84C 12=LO, 14=HI
+              if (value & 0x02)
+              {
+                font_lowercase = true;
+              }
+              else
+              {
+                font_lowercase = false;
+              }
+          }
+#ifdef PETIO_EDIT
+          else if ( address == 0xe000)
+          {
+            edit80 = (value &= 0xff)?false:true;
+          }
+#endif
         }
         pio_sm_drain_tx_fifo(pio,smread);
       }
@@ -185,19 +159,31 @@ void __noinline __time_critical_func(petbus_loop)(void) {
 */        
       }      
     }
-    else {
-      pio_sm_drain_tx_fifo(pio,smread);
-    }
-#endif
   }
 }
 
 /********************************
  * Initialization
 ********************************/ 
-void petbus_init(void (*mem_write_callback)(uint16_t address, uint8_t value))
+void petbus_init(void)
 { 
-  mem_write = mem_write_callback;
+
+  readFuncTable[0]=readNone;
+  readFuncTable[1]=readNone;
+  readFuncTable[2]=readNone;
+  readFuncTable[3]=readNone;
+  readFuncTable[4]=readNone;
+  readFuncTable[5]=readNone;
+  readFuncTable[6]=readNone;
+  readFuncTable[7]=readNone;
+  readFuncTable[8]=read8000;
+  readFuncTable[9]=read9000;
+  readFuncTable[10]=readA000;
+  readFuncTable[11]=readNone;
+  readFuncTable[12]=readNone;
+  readFuncTable[13]=readNone;
+  readFuncTable[14]=readNone;
+  readFuncTable[15]=readNone;
  
 #ifdef PETIO_EDIT
   if (edit80) {
@@ -265,29 +251,8 @@ void petbus_init(void (*mem_write_callback)(uint16_t address, uint8_t value))
       gpio_set_pulls(pin, false, false);
   }
 
-#ifdef PETIO_IRQ
-  // Find a free irq
-  static int8_t pio_irq;
-  static_assert(PIO0_IRQ_1 == PIO0_IRQ_0 + 1 && PIO1_IRQ_1 == PIO1_IRQ_0 + 1, "");
-  pio_irq = (pio == pio0) ? PIO0_IRQ_0 : PIO1_IRQ_0;
-  if (irq_get_exclusive_handler(pio_irq)) {
-      pio_irq++;
-      if (irq_get_exclusive_handler(pio_irq)) {
-          panic("All IRQs are in use");
-      }
-  }
+//  pio_sm_set_enabled(pio, sm, true);
 
-  // Enable interrupt
-  irq_set_priority (pio_irq, PICO_DEFAULT_IRQ_PRIORITY-8);  
-  irq_add_shared_handler(pio_irq, rx_irq, 1); // Add a shared IRQ handler
-//  irq_set_exclusive_handler(pio_irq, rx_irq); // Add a shared IRQ handler
-  irq_set_enabled(pio_irq, true); // Enable the IRQ
-  const uint irq_index = pio_irq - ((pio == pio0) ? PIO0_IRQ_0 : PIO1_IRQ_0); // Get index of the IRQ
-  pio_set_irqn_source_enabled(pio, irq_index, (pio_interrupt_source)(pis_sm0_rx_fifo_not_empty + sm), true); // Set pio to tell us when the FIFO is NOT empty
-  //pio_set_irqn_source_enabled(pio, irq_index, (pio_interrupt_source)(pis_interrupt0 + sm), true);
-  pio_sm_set_enabled(pio, sm, true);
-#endif
-/*
   irq_set_enabled(TIMER_IRQ_0, false);
   irq_set_enabled(TIMER_IRQ_1, false);
   irq_set_enabled(TIMER_IRQ_2, false);
@@ -313,7 +278,7 @@ void petbus_init(void (*mem_write_callback)(uint16_t address, uint8_t value))
   irq_set_enabled(I2C0_IRQ, false);
   irq_set_enabled(I2C1_IRQ, false);
   irq_set_enabled(RTC_IRQ, false);
-*/
+
   pio_enable_sm_mask_in_sync(pio, (1 << sm) | (1 << smread));
   pio_sm_clear_fifos(pio,sm);
   pio_sm_clear_fifos(pio,smread);
