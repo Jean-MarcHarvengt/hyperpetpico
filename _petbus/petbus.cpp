@@ -4,8 +4,8 @@
 #include "petbus.pio.h"
 #ifdef PETIO_EDIT
 //#include "edit4.h"
-//#include "edit480.h"
-#include "edit450.h"
+#include "edit480.h"
+//#include "edit450.h"
 #include "edit48050.h"
 #endif
 #endif
@@ -39,9 +39,20 @@ static uint32_t reset_counter = 0;
 static bool got_reset = false;
 
 #ifdef PETIO_EDIT
-static unsigned char mem_9000[0x0800];
-static bool edit80 = true;
+static unsigned char mem_e000[0x0800];
+static bool edit8050 = true;
 #endif
+
+extern void (*traParamFuncPtr[])(void);
+extern void (*traParamFunc)(void);
+extern uint8_t cmd_params_len[]; 
+extern int cmd_nb_params;
+extern int param_ind;
+extern void (*traDataFunc)(uint8_t);
+extern void (*traDataFuncPtr[])(uint8_t);
+extern uint8_t tra_params[MAX_PAR];
+extern int tra_h;
+extern void pushCmdQueue(QueueItem cmd );
 
 /********************************
  * petio PIO read table
@@ -59,12 +70,28 @@ static void __not_in_flash("read9000") read9000(uint32_t address) {
 }
 
 static void __not_in_flash("readA000") readA000(uint32_t address) {
+#ifdef PETIO_A000
   pio1->txf[smread] = 0x100 | mem_a000[address-0xa000];
+#else
+  pio1->txf[smread] = 0;
+#endif
 }
 
-static void (*readFuncTable[16])(uint32_t);/*
- = {
+static void __not_in_flash("readE000") readE000(uint32_t address) {
+#ifdef PETIO_EDIT        
+  if (address < 0xe800) {
+    pio1->txf[smread] = 0x100 | mem_e000[address-0xe000];
+  }
+  else {
+    pio1->txf[smread] = 0;
+  }
+#else
+  pio1->txf[smread] = 0;
+#endif
+}
 
+static void __not_in_flash("readFuncTable") (*readFuncTable[16])(uint32_t)
+{
   readNone, // 0
   readNone, // 1
   readNone, // 2 
@@ -79,12 +106,105 @@ static void (*readFuncTable[16])(uint32_t);/*
   readNone, // b
   readNone, // c
   readNone, // d
-  readNone, // e
+  readE000, // e
   readNone, // f
 };
-*/
 
-extern void handle_custom_registers(uint16_t address, uint8_t value);
+/********************************
+ * petio PIO write table
+********************************/ 
+static void __not_in_flash("writeNone") writeNone(uint32_t address, uint8_t value) {
+  pio_sm_drain_tx_fifo(pio,smread);
+}
+
+static void __not_in_flash("write89000") write89000(uint32_t address, uint8_t value) {
+  mem[address-0x8000] = value;
+  switch (address-0x8000) 
+  {  
+    case REG_TDEPTH:
+      traDataFunc = traDataFuncPtr[value&0x0f];
+      break;
+    case REG_TCOMMAND:
+      param_ind = 0;
+      cmd_nb_params = cmd_params_len[value&(MAX_CMD-1)];
+      traParamFunc = traParamFuncPtr[value&(MAX_CMD-1)];
+      break;
+    case REG_TPARAMS:
+      tra_params[param_ind++]=value;
+      if (param_ind == cmd_nb_params) traParamFunc();
+      break;
+    case REG_TDATA:
+      if (tra_h)
+      {
+        traDataFunc(value);
+        if (!tra_h) {
+          switch (mem[REG_TCOMMAND]) 
+          {
+            case cmd_transfer_packed_tile_data:
+              pushCmdQueue({cmd_unpack_tiles});
+              break;
+            case cmd_transfer_packed_sprite_data:
+              pushCmdQueue({cmd_unpack_sprites});
+              break;
+            case cmd_transfer_packed_bitmap_data:
+              pushCmdQueue({cmd_unpack_bitmap});
+              break;  
+          }
+        }  
+      }   
+      break;
+    default:
+      break;
+  } 
+}
+
+static void __not_in_flash("writeA000") writeA000(uint32_t address, uint8_t value) {
+#ifdef PETIO_A000
+  mem_a000[address-0xa000] = value;
+#endif
+}
+
+static void __not_in_flash("writeE000") writeE000(uint32_t address, uint8_t value) {
+  if (address == 0xe84C)
+  {
+    // e84C 12=LO, 14=HI
+    if (value & 0x02)
+    {
+      font_lowercase = true;
+    }
+    else
+    {
+      font_lowercase = false;
+    }
+  }
+#ifdef PETIO_EDIT
+  else if ( address == 0xe000)
+  {
+    edit8050 = (value &= 0xff)?false:true;
+  }
+#endif
+}
+
+static void __not_in_flash("writeFuncTable") (*writeFuncTable[16])(uint32_t,uint8_t)
+{
+  writeNone, // 0
+  writeNone, // 1
+  writeNone, // 2 
+  writeNone, // 3
+  writeNone, // 4
+  writeNone, // 5
+  writeNone, // 6
+  writeNone, // 7
+  write89000, // 8
+  write89000, // 9
+  writeA000, // a
+  writeNone, // b
+  writeNone, // c
+  writeNone, // d
+  writeE000, // e
+  writeNone, // f
+};
+
 
 /********************************
  * petio loop
@@ -99,64 +219,12 @@ void __not_in_flash("__time_critical_func") petbus_loop(void) {
       uint16_t address = (value >> 9) & 0xffff;      
       if (is_write)
       {
-        if ( address >= 0x8000)
-        {
-          if ( address < 0xa000)
-          {
-            mem[address-0x8000] = value &= 0xff;
-            //handle_custom_registers(address, value &= 0xff);
-          }
-#ifdef PETIO_A000
-          else if ( address < 0xb000)
-          {
-            mem_a000[address-0xa000] = value &= 0xff;
-          }
-#endif
-          else if (address == 0xe84C)
-          {
-              // e84C 12=LO, 14=HI
-              if (value & 0x02)
-              {
-                font_lowercase = true;
-              }
-              else
-              {
-                font_lowercase = false;
-              }
-          }
-#ifdef PETIO_EDIT
-          else if ( address == 0xe000)
-          {
-            edit80 = (value &= 0xff)?false:true;
-          }
-#endif
-        }
-        pio_sm_drain_tx_fifo(pio,smread);
+        void (*writeFunc)(uint32_t,uint8_t) = writeFuncTable[address>>12];
+        writeFunc(address, value & 0xff);
       }
       else {
         void (*readFunc)(uint32_t) = readFuncTable[address>>12];
         readFunc(address);
-/*        
-        value = 0;
-#ifdef PETIO_A000        
-        if ( ( address >= 0xa000) && ( address < 0xb000) ) 
-        {
-          value = 0x100 | mem_a000[address-0xa000];
-        }
-        else  
-#endif 
-        if ( ( address >= 0x9000) && ( address < 0xa000) ) 
-        {
-          value = 0x100 | mem[address-0x9000+0x1000];
-        }
-#ifdef PETIO_EDIT        
-        else if ( ( address >= 0xe000) && ( address < 0xe800) ) 
-        {
-          value = 0x100 | mem_9000[address-0xe000];
-        } 
-#endif
-        pio1->txf[smread] = value;
-*/        
       }      
     }
   }
@@ -167,30 +235,12 @@ void __not_in_flash("__time_critical_func") petbus_loop(void) {
 ********************************/ 
 void petbus_init(void)
 { 
-
-  readFuncTable[0]=readNone;
-  readFuncTable[1]=readNone;
-  readFuncTable[2]=readNone;
-  readFuncTable[3]=readNone;
-  readFuncTable[4]=readNone;
-  readFuncTable[5]=readNone;
-  readFuncTable[6]=readNone;
-  readFuncTable[7]=readNone;
-  readFuncTable[8]=read8000;
-  readFuncTable[9]=read9000;
-  readFuncTable[10]=readA000;
-  readFuncTable[11]=readNone;
-  readFuncTable[12]=readNone;
-  readFuncTable[13]=readNone;
-  readFuncTable[14]=readNone;
-  readFuncTable[15]=readNone;
- 
 #ifdef PETIO_EDIT
-  if (edit80) {
-    memcpy((void *)&mem_9000[0], (void *)&edit480[0], 0x800);
+  if (edit8050) {
+    memcpy((void *)&mem_e000[0], (void *)&edit48050[0], 0x800);
   }
   else {
-    memcpy((void *)&mem_9000[0], (void *)&edit4[0], 0x800);
+    memcpy((void *)&mem_e000[0], (void *)&edit480[0], 0x800);
   }
 #endif
 
@@ -315,11 +365,11 @@ extern bool petbus_poll_reset(void)
 extern void petbus_reset(void)
 {
  #ifdef PETIO_EDIT        
-  if (edit80) {
-    memcpy((void *)&mem_9000[0], (void *)&edit480[0], 0x800);
+  if (edit8050) {
+    memcpy((void *)&mem_e000[0], (void *)&edit48050[0], 0x800);
   }
   else {
-    memcpy((void *)&mem_9000[0], (void *)&edit4[0], 0x800);
+    memcpy((void *)&mem_e000[0], (void *)&edit480[0], 0x800);
   }
 #endif 
 }

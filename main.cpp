@@ -42,7 +42,6 @@ extern "C" void hid_app_task(void);
 #include "toolkit4.0_rom-a000.h"
 #include "wordpro3-rom-a000.h"
 #include "menuloader-9000.h"
-#include "menuloader2-9000.h"
 
 static const unsigned char * a000_rom_list[] = {
   vsync,
@@ -572,7 +571,6 @@ static void VideoRenderInit(void)
 #ifdef PETIO_A000
   // sys 36864 / sys 40960
   memcpy((void *)&mem[0x1000], (void *)&menuloader[0], sizeof(menuloader));
-//  memcpy((void *)&mem[0x1000], (void *)&menuloader2[0], 113);
 #endif 
   // initialize GFX memory
   ResetGFXMem();  
@@ -657,59 +655,27 @@ static void SystemReset(void)
 }
 
 // ****************************************
-// PET memory access IRQ
+// PET memory access 
 // ****************************************
-#define MAX_CMD 32
-#define MAX_PAR 8
-
-static uint8_t tra_params[MAX_PAR];
-static int cmd_nb_params;
-static int param_ind;
-static void (*traParamFunc)(void);
+int cmd_nb_params;
+int param_ind;
+void (*traParamFunc)(void);
+void (*traDataFunc)(uint8_t);
+uint8_t tra_params[MAX_PAR];
+int tra_h;
 
 static uint8_t * tra_address;
 static int tra_x;
 static int tra_w;
-static int tra_h;
 static int tra_stride;
 static uint8_t tra_spr_id;
-static void (*traDataFunc)(uint8_t);
 static uint8_t * tra_pal = &mem[REG_TLOOKUP];
-
-#define CMD_QUEUE_SIZE 256
-typedef struct {
-   uint8_t  id;
-   uint8_t  p8_1;
-   uint8_t  p8_2;
-   uint8_t  p8_3;
-   uint16_t p16_1;
-   uint16_t p16_2;
-} QueueItem;
 
 static QueueItem cmd_queue[CMD_QUEUE_SIZE];
 static uint8_t cmd_queue_rd=0;
 static uint8_t cmd_queue_wr=0;
 static uint8_t cmd_queue_cnt=0;
 
-typedef enum {
-  cmd_undef=0,
-  cmd_transfer_tile_data=1,
-  cmd_transfer_sprite_data=2,
-  cmd_transfer_bitmap_data=3,
-  cmd_transfer_tilemap_col=4,
-  cmd_transfer_tilemap_row=5,
-  cmd_transfer_packed_tile_data=6,
-  cmd_transfer_packed_sprite_data=7,
-  cmd_transfer_packed_bitmap_data=8,
-  cmd_unpack_tiles=9,
-  cmd_unpack_sprites=10,
-  cmd_unpack_bitmap=11,
-  cmd_bitmap_clr=12,
-  cmd_bitmap_point=13,
-  cmd_bitmap_rect=14, 
-  cmd_bitmap_tri=15,
-  cmd_a000_bank=31,
-} Cmd;
 
 static void handleCmdQueue(void) {
   while (cmd_queue_cnt)
@@ -741,7 +707,7 @@ static void handleCmdQueue(void) {
   }  
 }
 
-static void pushCmdQueue(QueueItem cmd ) {
+void __not_in_flash("pushCmdQueue") pushCmdQueue(QueueItem cmd ) {
   if (cmd_queue_cnt != 256)
   {
     cmd_queue[cmd_queue_wr] = cmd;
@@ -750,7 +716,7 @@ static void pushCmdQueue(QueueItem cmd ) {
   }  
 }
 
-static const uint8_t cmd_params_len[MAX_CMD]={ 
+uint8_t __not_in_flash("cmd_params_len") cmd_params_len[MAX_CMD]={ 
 //       0:  idle
 //       1:  transfer tiles data      (data=tilenr,w,h,packet pixels)
 //       2:  transfer sprites data    (data=spritenr,w,h,packet pixels)
@@ -772,10 +738,10 @@ static const uint8_t cmd_params_len[MAX_CMD]={
   0,3,3,6,4,4,2,2,2, 0,0,0, 0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
 }; 
 
-static void traParamFuncDummy(void){
+static void __not_in_flash("traParamFuncDummy") traParamFuncDummy(void){
 }
 
-static void traParamFuncTile(void){
+static void __not_in_flash("traParamFuncTile") traParamFuncTile(void){
   tra_spr_id = SPRITE_NBTILES; // not a sprite!
   tra_x = 0;
   tra_w = tra_params[1];
@@ -784,7 +750,7 @@ static void traParamFuncTile(void){
   tra_address = &TileData[tra_w*tra_stride*(tra_params[0])];
 }
 
-static void traParamFuncSprite(void){
+static void __not_in_flash("traParamFuncSprite") traParamFuncSprite(void){
   tra_spr_id = tra_params[0] & (SPRITE_NBTILES-1);
   tra_x = 0;
   tra_w = tra_params[1];
@@ -793,7 +759,7 @@ static void traParamFuncSprite(void){
   tra_address = &SpriteData[tra_w*tra_stride*tra_spr_id];
 }
 
-static void traParamFuncBitmap(void){
+static void __not_in_flash("traParamFuncBitmap") traParamFuncBitmap(void){
   tra_stride = screen_width==HI_XRES?screen_width/2:screen_width;  
   tra_address = &Bitmap[tra_stride*tra_params[2]+((tra_params[0]<<8)+tra_params[1])];
   tra_x = 0; 
@@ -801,7 +767,7 @@ static void traParamFuncBitmap(void){
   tra_h = tra_params[5];  
 }
 
-static void traParamFuncTmapcol(void){
+static void __not_in_flash("traParamFuncTmapcol") traParamFuncTmapcol(void){
   tra_stride = screen_width/8; 
   tra_address = &mem[REG_TILEMAP_L0-TILEMAP_SIZE*tra_params[0]+tra_stride*tra_params[2]+tra_params[1]];
   tra_x = 0; 
@@ -809,7 +775,7 @@ static void traParamFuncTmapcol(void){
   tra_h = tra_params[3];
 }
 
-static void traParamFuncTmaprow(void){
+static void __not_in_flash("traParamFuncTmaprow") traParamFuncTmaprow(void){
   tra_stride = screen_width/8; 
   tra_address = &mem[REG_TILEMAP_L0-TILEMAP_SIZE*tra_params[0]+tra_stride*tra_params[2]+tra_params[1]];
   tra_x = 0; 
@@ -817,28 +783,28 @@ static void traParamFuncTmaprow(void){
   tra_h = 1; 
 }
 
-static void traParamFuncPackedTiles(void){
+static void __not_in_flash("traParamFuncPackedTiles") traParamFuncPackedTiles(void){
   tra_h = (tra_params[0]<<8)+tra_params[1];
   tra_x = 0; //sizeof(TileData)-tra_h;
   tra_w = tra_h;
   tra_address = &Bitmap[0];
 }
 
-static void traParamFuncPackedSprites(void){
+static void __not_in_flash("traParamFuncPackedSprites") traParamFuncPackedSprites(void){
   tra_h = (tra_params[0]<<8)+tra_params[1];
   tra_x = 0; //sizeof(SpriteData)-tra_h;
   tra_w = tra_h;
   tra_address = &Bitmap[0];
 }
 
-static void traParamFuncPackedBitmap(void){
+static void __not_in_flash("traParamFuncPackedBitmap") traParamFuncPackedBitmap(void){
   tra_h = (tra_params[0]<<8)+tra_params[1];
   tra_x = 0; //sizeof(Bitmap)-tra_h;
   tra_w = tra_h;
   tra_address = &TileData[0];
 }
 
-static void traParamFuncExecuteCommand(void){
+static void __not_in_flash("traParamFuncExecuteCommand") traParamFuncExecuteCommand(void){
   switch (mem[REG_TCOMMAND]) 
   {
     case cmd_transfer_packed_tile_data:
@@ -860,7 +826,7 @@ static void traParamFuncExecuteCommand(void){
 }
 
 
-static void (*traParamFuncPtr[MAX_CMD])(void) = {
+void __not_in_flash("traParamFuncPtr") (*traParamFuncPtr[MAX_CMD])(void) = {
   traParamFuncDummy,
   traParamFuncTile,
   traParamFuncSprite,
@@ -896,22 +862,22 @@ static void (*traParamFuncPtr[MAX_CMD])(void) = {
   traParamFuncExecuteCommand
 };
 
-static void traDataFunc8nolut(uint8_t val) {
+static void __not_in_flash("traDataFunc8nolut") traDataFunc8nolut(uint8_t val) {
   tra_address[tra_x++]=val; if (tra_x == tra_w) {tra_x=0; tra_address+=tra_stride; tra_h--; };
 }
 
-static void traDataFunc8(uint8_t val) {
+static void __not_in_flash("traDataFunc8") traDataFunc8(uint8_t val) {
   tra_address[tra_x++]=tra_pal[val]; if (tra_x == tra_w) {tra_x=0; tra_address+=tra_stride; tra_h--; };
 }
 
-static void traDataFunc4(uint8_t val) {
+static void __not_in_flash("traDataFunc4") traDataFunc4(uint8_t val) {
   tra_address[tra_x++]=tra_pal[val>>4]; if (tra_x == tra_w) {tra_x=0; tra_address+=tra_stride; tra_h--; };
   if (tra_h) {
     tra_address[tra_x++]=tra_pal[val&0xf]; if (tra_x == tra_w) {tra_x=0; tra_address+=tra_stride; tra_h--; };
   }  
 }
 
-static void traDataFunc2(uint8_t val) {
+static void __not_in_flash("traDataFunc2") traDataFunc2(uint8_t val) {
   tra_address[tra_x++]=tra_pal[(val>>6)&0x3]; if (tra_x == tra_w) {tra_x=0; tra_address+=tra_stride; tra_h--; };
   if (tra_h) {
     tra_address[tra_x++]=tra_pal[(val>>4)&0x3]; if (tra_x == tra_w) {tra_x=0; tra_address+=tra_stride; tra_h--; };
@@ -924,7 +890,7 @@ static void traDataFunc2(uint8_t val) {
   }
 }
 
-static void traDataFunc1(uint8_t val) {
+static void __not_in_flash("traDataFunc1") traDataFunc1(uint8_t val) {
   tra_address[tra_x++]=tra_pal[(val>>7)&0x1]; if (tra_x == tra_w) {tra_x=0; tra_address+=tra_stride; tra_h--; };
   if (tra_h) {
     tra_address[tra_x++]=tra_pal[(val>>6)&0x1]; if (tra_x == tra_w) {tra_x=0; tra_address+=tra_stride; tra_h--; };
@@ -949,11 +915,11 @@ static void traDataFunc1(uint8_t val) {
   }
 }
 
-static void traDataFunc8nolutPacked(uint8_t val) {
+static void __not_in_flash("traDataFunc8nolutPacked") traDataFunc8nolutPacked(uint8_t val) {
   if (tra_h > 0) tra_address[tra_x++]=val; tra_h--;
 }
 
-static void (*traDataFuncPtr[])(uint8_t) = {
+void __not_in_flash("traDataFuncPtr") (*traDataFuncPtr[])(uint8_t) = {
   traDataFunc8nolutPacked, // 0
   traDataFunc1, // 1
   traDataFunc2, // 2 

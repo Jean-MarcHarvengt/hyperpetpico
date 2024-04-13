@@ -62,8 +62,8 @@ next_bus_cycle:
     jmp PIN, read_cycle                 ; jump based on the state of the R/W pin (1=read)
 
 write_cycle:
-    nop              [31]               ; wait 31*4ns
-    nop              [27]               ; wait 27*4ns
+    ;nop              [31]               ; wait 31*4ns
+    ;nop              [27]               ; wait 27*4ns
     in PINS, 9                          ; Data[7:0] + R/W, then autopush
     wait 0 GPIO, PHI2_GPIO  [14]        ; wait for PHI2 to fall and wait 14*4ns
     jmp next_bus_cycle

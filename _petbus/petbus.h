@@ -231,6 +231,39 @@ extern unsigned char mem_a000[0x1000];
 #endif
 extern bool font_lowercase;
 
+#define CMD_QUEUE_SIZE 256
+typedef struct {
+   uint8_t  id;
+   uint8_t  p8_1;
+   uint8_t  p8_2;
+   uint8_t  p8_3;
+   uint16_t p16_1;
+   uint16_t p16_2;
+} QueueItem;
+
+#define MAX_CMD 32
+#define MAX_PAR 8
+typedef enum {
+  cmd_undef=0,
+  cmd_transfer_tile_data=1,
+  cmd_transfer_sprite_data=2,
+  cmd_transfer_bitmap_data=3,
+  cmd_transfer_tilemap_col=4,
+  cmd_transfer_tilemap_row=5,
+  cmd_transfer_packed_tile_data=6,
+  cmd_transfer_packed_sprite_data=7,
+  cmd_transfer_packed_bitmap_data=8,
+  cmd_unpack_tiles=9,
+  cmd_unpack_sprites=10,
+  cmd_unpack_bitmap=11,
+  cmd_bitmap_clr=12,
+  cmd_bitmap_point=13,
+  cmd_bitmap_rect=14, 
+  cmd_bitmap_tri=15,
+  cmd_a000_bank=31,
+} Cmd;
+
+
 #ifdef HAS_PETIO
 extern void petbus_init(void);
 extern void petbus_loop(void);
