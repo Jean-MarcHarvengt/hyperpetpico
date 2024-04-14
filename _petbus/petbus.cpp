@@ -25,7 +25,6 @@ bool font_lowercase = false;
 #define CONFIG_PIN_PETBUS_CONTROL_BASE (CONFIG_PIN_PETBUS_DATA_BASE + 9) //CE DATA,ADDRLO,ADDRHI
 #define CONFIG_PIN_PETBUS_PHI2  26
 #define CONFIG_PIN_PETBUS_DATADIR 28
-#define CONFIG_PIN_PETBUS_READCTRL 27
 #define CONFIG_PIN_PETBUS_RESET 22
 
 #define VALID_CYCLE ((1 << CONFIG_PIN_PETBUS_PHI2) | (1 << CONFIG_PIN_PETBUS_RESET))
@@ -100,7 +99,7 @@ static void __not_in_flash("readFuncTable") (*readFuncTable[16])(uint32_t)
   readNone, // 5
   readNone, // 6
   readNone, // 7
-  read8000, // 8
+  readNone, // 8
   read9000, // 9
   readA000, // a
   readNone, // b
@@ -210,7 +209,6 @@ static void __not_in_flash("writeFuncTable") (*writeFuncTable[16])(uint32_t,uint
  * petio loop
 ********************************/ 
 void __not_in_flash("__time_critical_func") petbus_loop(void) {
-//void __noinline __time_critical_func(petbus_loop)(void) {
   for(;;) {
     uint32_t allgpios = sio_hw->gpio_in; 
     if ((allgpios & VALID_CYCLE) == VALID_CYCLE) {
@@ -250,10 +248,8 @@ void petbus_init(void)
   pio_sm_config cread = petbus_device_read_program_get_default_config(progra_offsetread);
   // map the OUT pin group to the data signals
   sm_config_set_out_pins(&cread, CONFIG_PIN_PETBUS_DATA_BASE, 8);
-  // map the SET pin group to the Data transceiver control signals
+  // map the SET pin group to the Data transceiver control signals (+ CS 9000/A000/E000)
   sm_config_set_set_pins(&cread, CONFIG_PIN_PETBUS_DATADIR, 1);
-  sm_config_set_sideset_pins(&cread, CONFIG_PIN_PETBUS_READCTRL);
-//  sm_config_set_sideset_pins(&cread, CONFIG_PIN_PETBUS_CONTROL_BASE);
   pio_sm_init(pio, smread, progra_offsetread, &cread);
 
   // Init PETBUS main SM
@@ -271,15 +267,12 @@ void petbus_init(void)
   pio_sm_init(pio, sm, progra_offset, &c);
 
   // configure the GPIOs
-  // Ensure all transceivers disabled and datadir is 0 (in) 
+  // Ensure all transceivers disabled and datadir is 1 (input) 
   pio_sm_set_pins_with_mask(
-      pio, sm, ((uint32_t)0x7 << CONFIG_PIN_PETBUS_CONTROL_BASE) | ((uint32_t)0x1 << CONFIG_PIN_PETBUS_READCTRL) , 
-               ((uint32_t)0x7 << CONFIG_PIN_PETBUS_CONTROL_BASE) | ((uint32_t)0x1 << CONFIG_PIN_PETBUS_DATADIR) | ((uint32_t)0x1 << CONFIG_PIN_PETBUS_READCTRL));
-  pio_sm_set_pindirs_with_mask(pio, sm, ((uint32_t)0x7 << CONFIG_PIN_PETBUS_CONTROL_BASE) | ((uint32_t)0x1 << CONFIG_PIN_PETBUS_READCTRL) | ((uint32_t)0x1 << CONFIG_PIN_PETBUS_DATADIR),
-      ((uint32_t)0x1 << CONFIG_PIN_PETBUS_PHI2) | ((uint32_t)0x1 << CONFIG_PIN_PETBUS_RESET) | ((uint32_t)0x7 << CONFIG_PIN_PETBUS_CONTROL_BASE) | ((uint32_t)0x1 << CONFIG_PIN_PETBUS_READCTRL) | ((uint32_t)0x1 << CONFIG_PIN_PETBUS_DATADIR) | ((uint32_t)0x1ff << CONFIG_PIN_PETBUS_DATA_BASE));
-
- // pio_sm_set_pins_with_mask(pio, smread, 0, ((uint32_t)0x1 << CONFIG_PIN_PETBUS_DATADIR));
- // pio_sm_set_pindirs_with_mask(pio, smread,((uint32_t)0x1 << CONFIG_PIN_PETBUS_DATADIR), ((uint32_t)0x1 << CONFIG_PIN_PETBUS_DATADIR) /*| ((uint32_t)0xff << CONFIG_PIN_PETBUS_DATA_BASE)*/) ;
+      pio, sm, ((uint32_t)0x7 << CONFIG_PIN_PETBUS_CONTROL_BASE) | ((uint32_t)0x1 << CONFIG_PIN_PETBUS_DATADIR) , 
+               ((uint32_t)0x7 << CONFIG_PIN_PETBUS_CONTROL_BASE) | ((uint32_t)0x1 << CONFIG_PIN_PETBUS_DATADIR) );
+  pio_sm_set_pindirs_with_mask(pio, sm, ((uint32_t)0x7 << CONFIG_PIN_PETBUS_CONTROL_BASE) | ((uint32_t)0x1 << CONFIG_PIN_PETBUS_DATADIR),
+      ((uint32_t)0x1 << CONFIG_PIN_PETBUS_PHI2) | ((uint32_t)0x1 << CONFIG_PIN_PETBUS_RESET) | ((uint32_t)0x7 << CONFIG_PIN_PETBUS_CONTROL_BASE) | ((uint32_t)0x1 << CONFIG_PIN_PETBUS_DATADIR) | ((uint32_t)0x1ff << CONFIG_PIN_PETBUS_DATA_BASE));
 
   // Disable input synchronization on input pins that are sampled at known stable times
   // to shave off two clock cycles of input latency
@@ -294,7 +287,6 @@ void petbus_init(void)
       pio_gpio_init(pio, pin);
   }
   pio_gpio_init(pio, CONFIG_PIN_PETBUS_DATADIR);
-  pio_gpio_init(pio, CONFIG_PIN_PETBUS_READCTRL);
 
   for(int pin = CONFIG_PIN_PETBUS_DATA_BASE; pin < CONFIG_PIN_PETBUS_DATA_BASE + 9; pin++) {
       pio_gpio_init(pio, pin);
@@ -303,6 +295,7 @@ void petbus_init(void)
 
 //  pio_sm_set_enabled(pio, sm, true);
 
+  // Disable all interrupts on this core
   irq_set_enabled(TIMER_IRQ_0, false);
   irq_set_enabled(TIMER_IRQ_1, false);
   irq_set_enabled(TIMER_IRQ_2, false);

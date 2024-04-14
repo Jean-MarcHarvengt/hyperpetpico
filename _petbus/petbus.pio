@@ -62,8 +62,8 @@ next_bus_cycle:
     jmp PIN, read_cycle                 ; jump based on the state of the R/W pin (1=read)
 
 write_cycle:
-    ;nop              [31]               ; wait 31*4ns
-    ;nop              [27]               ; wait 27*4ns
+ ;   nop              [31]               ; wait 31*4ns
+ ;   nop              [27]               ; wait 27*4ns
     in PINS, 9                          ; Data[7:0] + R/W, then autopush
     wait 0 GPIO, PHI2_GPIO  [14]        ; wait for PHI2 to fall and wait 14*4ns
     jmp next_bus_cycle
@@ -84,9 +84,8 @@ read_cycle:
 ;  * sideset pin being the data tranceiver also used
 ; SET bits for tranceiver control:
 ;  0bx
-;    x - Data transceiver direction (0=input, 1=output)
+;    x - Data transceiver direction + CS OUT (1=input, 0=output)
 ;
-.side_set 1 opt                       ; DATA tranceiver CS
 .wrap_target
 wait_loop:
     wait 1 irq 7                      ; wait start of read cycle from main sm
@@ -94,14 +93,14 @@ wait_loop:
     mov X, OSR                        ; save OSR in X for later
     jmp !X,wait_loop                  ; 0 means read not for us (not in pico read memory map)
     irq set 6                         ; block main sm
-    set PINS, 0b1 side 0              ; enable DATADIR (now outputing data), now we are 200ns before falling edge
+    set PINS, 0b0                     ; enable DATADIR (now outputing data), now we are 200ns before falling edge
     mov OSR, ~NULL                    ; change data pins as outputs 
     out PINDIRS, 8  
-    mov OSR, X                    ; output data lowest 8 bits (12*4ns later)
+    mov OSR, X                        ; output data lowest 8 bits (12*4ns later)
     out PINS, 8 
 
     wait 0 GPIO, PHI2_GPIO [7]        ; wait for PHI0 to fall 
-    set PINS, 0b0 side 1              ; disable DATADIR (now input) and tristate buffer
+    set PINS, 0b1                     ; disable DATADIR (now input)
     mov OSR, NULL
     out PINDIRS, 8                    ; reset data pins as inputs
 
