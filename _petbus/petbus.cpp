@@ -42,16 +42,16 @@ static unsigned char mem_e000[0x0800];
 static bool edit8050 = true;
 #endif
 
-extern void (*traParamFuncPtr[])(void);
-extern void (*traParamFunc)(void);
-extern uint8_t cmd_params_len[]; 
-extern int cmd_nb_params;
-extern int param_ind;
-extern void (*traDataFunc)(uint8_t);
-extern void (*traDataFuncPtr[])(uint8_t);
-extern uint8_t tra_params[MAX_PAR];
+extern uint8_t cmd;
+
+extern uint8_t __not_in_flash("cmd_params") cmd_params[MAX_PAR];
 extern int tra_h;
+extern uint8_t __not_in_flash("cmd_params_len") cmd_params_len[]; 
+extern void __not_in_flash("traParamFuncPtr") (*traParamFuncPtr[])(void);
+extern void __not_in_flash("traDataFuncPtr") (*traDataFuncPtr[])(uint8_t);
 extern void pushCmdQueue(QueueItem cmd );
+static uint8_t cmd_param_ind;
+static uint8_t cmd_tra_depth;
 
 /********************************
  * petio PIO read table
@@ -117,27 +117,27 @@ static void __not_in_flash("writeNone") writeNone(uint32_t address, uint8_t valu
 }
 
 static void __not_in_flash("write89000") write89000(uint32_t address, uint8_t value) {
-  mem[address-0x8000] = value;
   switch (address-0x8000) 
   {  
     case REG_TDEPTH:
-      traDataFunc = traDataFuncPtr[value&0x0f];
+      cmd_tra_depth = value&0x0f;
       break;
     case REG_TCOMMAND:
-      param_ind = 0;
-      cmd_nb_params = cmd_params_len[value&(MAX_CMD-1)];
-      traParamFunc = traParamFuncPtr[value&(MAX_CMD-1)];
+      cmd_param_ind = 0;
+      cmd = value & (MAX_CMD-1);
       break;
     case REG_TPARAMS:
-      tra_params[param_ind++]=value;
-      if (param_ind == cmd_nb_params) traParamFunc();
+      if (cmd_param_ind < MAX_PAR) cmd_params[cmd_param_ind++]=value;
+      if (cmd_param_ind == cmd_params_len[cmd]) {
+        traParamFuncPtr[cmd]();
+      }
       break;
     case REG_TDATA:
       if (tra_h)
       {
-        traDataFunc(value);
+        traDataFuncPtr[cmd_tra_depth](value);
         if (!tra_h) {
-          switch (mem[REG_TCOMMAND]) 
+          switch (cmd) 
           {
             case cmd_transfer_packed_tile_data:
               pushCmdQueue({cmd_unpack_tiles});
@@ -147,12 +147,13 @@ static void __not_in_flash("write89000") write89000(uint32_t address, uint8_t va
               break;
             case cmd_transfer_packed_bitmap_data:
               pushCmdQueue({cmd_unpack_bitmap});
-              break;  
+              break;
           }
         }  
       }   
       break;
     default:
+      mem[address-0x8000] = value;
       break;
   } 
 }

@@ -224,27 +224,29 @@ static void VideoInit(u8 mode, bool firstTime)
   switch (mode) {
     case 0: // 640x200
       screen_width = 640;
-      // initialize system clock
-      set_sys_clock_pll(Vmode0.vco*1000, Vmode0.pd1, Vmode0.pd2);
       // initialize videomode
-      if (firstTime) VgaInitReq(&Vmode0);
+      if (firstTime) {
+        set_sys_clock_pll(Vmode0.vco*1000, Vmode0.pd1, Vmode0.pd2);
+        VgaInitReq(&Vmode0);
+      }
       else VgaInit(&Vmode0);
       break;
     case 1: // 320x200
       screen_width = 320;
-      // initialize system clock
-      set_sys_clock_pll(Vmode1.vco*1000, Vmode1.pd1, Vmode1.pd2);
       // initialize videomode
-      if (firstTime) VgaInitReq(&Vmode1);
+      if (firstTime) {
+        set_sys_clock_pll(Vmode1.vco*1000, Vmode1.pd1, Vmode1.pd2);
+        VgaInitReq(&Vmode1);
+      }
       else VgaInit(&Vmode1);
       break;
     case 2: // 256x200
       screen_width = 256;
-      // draw box
-      // initialize system clock
-      set_sys_clock_pll(Vmode2.vco*1000, Vmode2.pd1, Vmode2.pd2);
       // initialize videomode
-      if (firstTime) VgaInitReq(&Vmode2);
+      if (firstTime) {
+        set_sys_clock_pll(Vmode2.vco*1000, Vmode2.pd1, Vmode2.pd2);
+        VgaInitReq(&Vmode2);
+      }
       else VgaInit(&Vmode2);
     default:
       break; 
@@ -657,13 +659,12 @@ static void SystemReset(void)
 // ****************************************
 // PET memory access 
 // ****************************************
-int cmd_nb_params;
-int param_ind;
-void (*traParamFunc)(void);
-void (*traDataFunc)(uint8_t);
-uint8_t tra_params[MAX_PAR];
+uint8_t cmd;
+uint8_t cmd_params[MAX_PAR];
 int tra_h;
 
+static uint8_t cmd_param_ind;
+static uint8_t cmd_tra_depth;
 static uint8_t * tra_address;
 static int tra_x;
 static int tra_w;
@@ -675,7 +676,6 @@ static QueueItem cmd_queue[CMD_QUEUE_SIZE];
 static uint8_t cmd_queue_rd=0;
 static uint8_t cmd_queue_wr=0;
 static uint8_t cmd_queue_cnt=0;
-
 
 static void handleCmdQueue(void) {
   while (cmd_queue_cnt)
@@ -744,68 +744,68 @@ static void __not_in_flash("traParamFuncDummy") traParamFuncDummy(void){
 static void __not_in_flash("traParamFuncTile") traParamFuncTile(void){
   tra_spr_id = SPRITE_NBTILES; // not a sprite!
   tra_x = 0;
-  tra_w = tra_params[1];
-  tra_h = tra_params[2];
+  tra_w = cmd_params[1];
+  tra_h = cmd_params[2];
   tra_stride = tra_w;
-  tra_address = &TileData[tra_w*tra_stride*(tra_params[0])];
+  tra_address = &TileData[tra_w*tra_stride*(cmd_params[0])];
 }
 
 static void __not_in_flash("traParamFuncSprite") traParamFuncSprite(void){
-  tra_spr_id = tra_params[0] & (SPRITE_NBTILES-1);
+  tra_spr_id = cmd_params[0] & (SPRITE_NBTILES-1);
   tra_x = 0;
-  tra_w = tra_params[1];
-  tra_h = tra_params[2]; 
+  tra_w = cmd_params[1];
+  tra_h = cmd_params[2]; 
   tra_stride = tra_w;
   tra_address = &SpriteData[tra_w*tra_stride*tra_spr_id];
 }
 
 static void __not_in_flash("traParamFuncBitmap") traParamFuncBitmap(void){
   tra_stride = screen_width==HI_XRES?screen_width/2:screen_width;  
-  tra_address = &Bitmap[tra_stride*tra_params[2]+((tra_params[0]<<8)+tra_params[1])];
+  tra_address = &Bitmap[tra_stride*cmd_params[2]+((cmd_params[0]<<8)+cmd_params[1])];
   tra_x = 0; 
-  tra_w = (tra_params[3]<<8)+tra_params[4];
-  tra_h = tra_params[5];  
+  tra_w = (cmd_params[3]<<8)+cmd_params[4];
+  tra_h = cmd_params[5];  
 }
 
 static void __not_in_flash("traParamFuncTmapcol") traParamFuncTmapcol(void){
-  tra_stride = screen_width/8; 
-  tra_address = &mem[REG_TILEMAP_L0-TILEMAP_SIZE*tra_params[0]+tra_stride*tra_params[2]+tra_params[1]];
+  tra_stride = screen_width/8;
+  tra_address = &mem[REG_TILEMAP_L0-TILEMAP_SIZE*cmd_params[0]+tra_stride*cmd_params[2]+cmd_params[1]];
   tra_x = 0; 
   tra_w = 1;
-  tra_h = tra_params[3];
+  tra_h = cmd_params[3];
 }
 
 static void __not_in_flash("traParamFuncTmaprow") traParamFuncTmaprow(void){
   tra_stride = screen_width/8; 
-  tra_address = &mem[REG_TILEMAP_L0-TILEMAP_SIZE*tra_params[0]+tra_stride*tra_params[2]+tra_params[1]];
+  tra_address = &mem[REG_TILEMAP_L0-TILEMAP_SIZE*cmd_params[0]+tra_stride*cmd_params[2]+cmd_params[1]];
   tra_x = 0; 
-  tra_w = tra_params[3];
+  tra_w = cmd_params[3];
   tra_h = 1; 
 }
 
 static void __not_in_flash("traParamFuncPackedTiles") traParamFuncPackedTiles(void){
-  tra_h = (tra_params[0]<<8)+tra_params[1];
+  tra_h = (cmd_params[0]<<8)+cmd_params[1];
   tra_x = 0; //sizeof(TileData)-tra_h;
   tra_w = tra_h;
   tra_address = &Bitmap[0];
 }
 
 static void __not_in_flash("traParamFuncPackedSprites") traParamFuncPackedSprites(void){
-  tra_h = (tra_params[0]<<8)+tra_params[1];
+  tra_h = (cmd_params[0]<<8)+cmd_params[1];
   tra_x = 0; //sizeof(SpriteData)-tra_h;
   tra_w = tra_h;
   tra_address = &Bitmap[0];
 }
 
 static void __not_in_flash("traParamFuncPackedBitmap") traParamFuncPackedBitmap(void){
-  tra_h = (tra_params[0]<<8)+tra_params[1];
+  tra_h = (cmd_params[0]<<8)+cmd_params[1];
   tra_x = 0; //sizeof(Bitmap)-tra_h;
   tra_w = tra_h;
   tra_address = &TileData[0];
 }
 
 static void __not_in_flash("traParamFuncExecuteCommand") traParamFuncExecuteCommand(void){
-  switch (mem[REG_TCOMMAND]) 
+  switch (cmd) 
   {
     case cmd_transfer_packed_tile_data:
       pushCmdQueue({cmd_unpack_tiles});
@@ -820,7 +820,7 @@ static void __not_in_flash("traParamFuncExecuteCommand") traParamFuncExecuteComm
       pushCmdQueue({cmd_bitmap_clr});
       break;      
     case cmd_a000_bank:
-      pushCmdQueue({cmd_a000_bank,tra_params[0]});
+      pushCmdQueue({cmd_a000_bank,cmd_params[0]});
       break;
   }
 }
@@ -916,7 +916,7 @@ static void __not_in_flash("traDataFunc1") traDataFunc1(uint8_t val) {
 }
 
 static void __not_in_flash("traDataFunc8nolutPacked") traDataFunc8nolutPacked(uint8_t val) {
-  if (tra_h > 0) tra_address[tra_x++]=val; tra_h--;
+  if (tra_h > 0) {tra_address[tra_x++]=val; tra_h--;};
 }
 
 void __not_in_flash("traDataFuncPtr") (*traDataFuncPtr[])(uint8_t) = {
@@ -935,48 +935,32 @@ void __not_in_flash("traDataFuncPtr") (*traDataFuncPtr[])(uint8_t) = {
   traDataFunc8nolut, // 12
   traDataFunc8nolut, // 13
   traDataFunc8nolut, // 14
-  traDataFunc8nolut, // 15
-  traDataFunc8nolut, // 16
-  traDataFunc8nolut, // 17
-  traDataFunc8nolut, // 18
-  traDataFunc8nolut, // 19
-  traDataFunc8nolut, // 20
-  traDataFunc8nolut, // 21
-  traDataFunc8nolut, // 22
-  traDataFunc8nolut, // 23
-  traDataFunc8nolut, // 24
-  traDataFunc8nolut, // 25
-  traDataFunc8nolut, // 26
-  traDataFunc8nolut, // 27
-  traDataFunc8nolut, // 28
-  traDataFunc8nolut, // 29
-  traDataFunc8nolut, // 30
-  traDataFunc8nolut  // 31
+  traDataFunc8nolut  // 15
 };
 
-void __not_in_flash("handle_custom_registers") handle_custom_registers(uint16_t address, uint8_t value)
-//static void handle_custom_registers(uint16_t address, uint8_t value) 
+static void __not_in_flash("handle_custom_registers") handle_custom_registers(uint16_t address, uint8_t value)
 {
   switch (address-0x8000) 
   {  
     case REG_TDEPTH:
-      traDataFunc = traDataFuncPtr[value&0x0f];
+      cmd_tra_depth = value&0x0f;
       break;
     case REG_TCOMMAND:
-      param_ind = 0;
-      cmd_nb_params = cmd_params_len[value&(MAX_CMD-1)];
-      traParamFunc = traParamFuncPtr[value&(MAX_CMD-1)];
+      cmd_param_ind = 0;
+      cmd = value & (MAX_CMD-1);
       break;
     case REG_TPARAMS:
-      tra_params[param_ind++]=value;
-      if (param_ind == cmd_nb_params) traParamFunc();
+      if (cmd_param_ind < MAX_PAR) cmd_params[cmd_param_ind++]=value;
+      if (cmd_param_ind == cmd_params_len[cmd]) {
+        traParamFuncPtr[cmd]();
+      }
       break;
     case REG_TDATA:
       if (tra_h)
       {
-        traDataFunc(value);
+        traDataFuncPtr[cmd_tra_depth](value);
         if (!tra_h) {
-          switch (mem[REG_TCOMMAND]) 
+          switch (cmd) 
           {
             case cmd_transfer_packed_tile_data:
               pushCmdQueue({cmd_unpack_tiles});
@@ -992,6 +976,7 @@ void __not_in_flash("handle_custom_registers") handle_custom_registers(uint16_t 
       }   
       break;
     default:
+      mem[address-0x8000] = value;      
       break;
   } 
 }
@@ -1140,7 +1125,6 @@ void writeWord( uint16_t location, uint8_t value)
     }
   }
   else if (location < 0xa000) {
-    mem[location-0x8000] = value;
     handle_custom_registers(location, value);
   }
 #ifdef PETIO_A000
