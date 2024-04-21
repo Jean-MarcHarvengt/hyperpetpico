@@ -74,11 +74,11 @@
 //
 // 9b0f: vsync line (0-200, 200 is overscan)
 //
-// 9b10: 3-0: transfer mode 
+// 9b10: 3-0: transfer mode (WR)
 //       1/2/4/8 bits per pixel (using indexed CLUT)
 //       9 = 8 bits RGB332 no CLUT
 //       0 = compressed
-// 9b11: transfer command
+// 9b11: transfer command (WR)
 //       0: idle
 //       1: transfer tiles data      (data=tilenr,w,h,packet pixels)
 //       2: transfer sprites data    (data=spritenr,w,h,packet pixels)
@@ -89,8 +89,9 @@
 //       7: transfer all sprite 8bits data compressed (data=sizeh,sizel,pixels)
 //       8: transfer bitmap 8bits data compressed (data=sizeh,sizel,pixels)
 
-// 9b12: transfer params
-// 9b13: transfer data
+// 9b12: transfer params (WR)
+// 9b13: transfer data   (RD/WR)
+// 9b14: transfer status (RD)
 //
 // Redefining tiles/sprite sequence
 // 1. write lookup palette entries needed
@@ -108,14 +109,15 @@
 // 5. write data sequence (N bytes/packed_bits)
 // 6. write transfer=0 to reset
 //
+// 9b18-9b37: 32 (re)SID registers (d400 on C64)
+
 // 9b38-9bff: lines background color (RGB332)
 // 9c00-9cc7: 7-4:  lines L1 xscroll hi, 3-0: L0 xscroll hi
 // 9cc8-9d8F: lines L0 xscroll lo
 // 9d90-9e58: lines L1 xscroll lo
 //
-// 9f00-9f1d: SID registers (d400 on C64)
-//
-// 9f80-9fff: Sprite collision
+// 9f00-9f7f: Sprite collision (first 8 sprites)
+// 9f80-9fff: Sprite collision (last  8 sprites)
 // 
 #define REG_TEXTMAP_L1    (0x8000 - 0x8000) // 32768
 #define REG_TILEMAP_L1    (0x8800 - 0x8000) // 34816
@@ -146,14 +148,16 @@
 #define REG_TCOMMAND      (0x9b11 - 0x8000) // 39697
 #define REG_TPARAMS       (0x9b12 - 0x8000) // 39698
 #define REG_TDATA         (0x9b13 - 0x8000) // 39699
+#define REG_TSTATUS       (0x9b14 - 0x8000) // 39700
+
+#define REG_SID_BASE      (0x9b18 - 0x8000) // 39704
 
 #define REG_LINES_BG_COL  (0x9b38 - 0x8000) // 39736
 #define REG_LINES_XSCR_HI (0x9c00 - 0x8000) // 39936
 #define REG_LINES_L0_XSCR (0x9cc8 - 0x8000) // 40136
 #define REG_LINES_L1_XSCR (0x9d90 - 0x8000) // 40336
-
-#define REG_SID_BASE      (0x9f00 - 0x8000) // 40192
-#define REG_SPRITE_COLI   (0x9f80 - 0x8000) // 40832
+#define REG_SPRITE_COL_LO (0x9f00 - 0x8000) // 40704
+#define REG_SPRITE_COL_HI (0x9f80 - 0x8000) // 40832
 
 #define GET_VIDEO_MODE    ( mem[REG_VIDEO_MODE] )
 #define GET_BG_COL        ( mem[REG_BG_COL] )
@@ -166,6 +170,7 @@
 #define GET_SC_END_L0     ( mem[REG_SC_END_L0] & 31 )
 #define GET_SC_START_L1   ( mem[REG_SC_START_L1] & 31 )
 #define GET_SC_END_L1     ( mem[REG_SC_END_L1] & 31 )
+#define GET_TSTATUS       ( mem[REG_TSTATUS] )
 
 #define SET_VIDEO_MODE(x) { mem[REG_VIDEO_MODE] = x; }
 #define SET_BG_COL(x)     { mem[REG_BG_COL] = x; }
@@ -242,7 +247,7 @@ typedef struct {
 } QueueItem;
 
 #define MAX_CMD 32
-#define MAX_PAR 8
+#define MAX_PAR 32
 typedef enum {
   cmd_undef=0,
   cmd_transfer_tile_data=1,
@@ -258,8 +263,12 @@ typedef enum {
   cmd_unpack_bitmap=11,
   cmd_bitmap_clr=12,
   cmd_bitmap_point=13,
-  cmd_bitmap_rect=14, 
+  cmd_bitmap_rect=14,
   cmd_bitmap_tri=15,
+  cmd_openfile=27,
+  cmd_readfile=28,
+  cmd_opendir=29,
+  cmd_readdir=30,
   cmd_a000_bank=31,
 } Cmd;
 

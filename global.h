@@ -6,6 +6,7 @@
 // defined in CMakeList.txt by target
 //#define HAS_PETIO       1  	// PET extension (or standalone emu)
 //#define HAS_NETWORK     1     // enable network wifi (standalone mode emu only)  
+#define HAS_USBHOST     1     // enable USB keyboard
 
 #define PETIO_A000      1     // enable A000-AFFF ROM emulation
 //#define PETIO_EDIT      1     // enable E000-E7FF ROM emulation

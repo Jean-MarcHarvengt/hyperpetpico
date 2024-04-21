@@ -22,14 +22,20 @@
 #include "network.h"
 #endif
 #include "bsp/board.h"
+#ifdef HAS_USBHOST
 #include "tusb.h"
 #include "kbd.h"
 extern "C" void cdc_task(void);
 extern "C" void hid_app_task(void);
 #endif
+#endif
 #include "decrunch.h"
 
+#include "flash.h"
+#include "ff.h"
+
 #ifdef PETIO_A000
+#include "fb.h"
 #include "vsync.h"
 #include "wedge.h"
 #include "jinsam8-rom-a000_database.h"
@@ -44,7 +50,8 @@ extern "C" void hid_app_task(void);
 #include "menuloader-9000.h"
 
 static const unsigned char * a000_rom_list[] = {
-  vsync,
+//  vsync,
+  fb,
   jinsam8,
   kram20,
   micromon80,
@@ -163,11 +170,26 @@ static ALIGNED u8 TileData[TILE_MAXDATA];
 // Reset
 static bool pet_reset = false;
 
+// filesystem
+static FATFS filesystem;
+static FATFS fatfs;
+static FIL file; 
+static DIR dir;
+static FILINFO entry;
+static FRESULT fres;
+#define MAX_FILES           10
+#define MAX_FILENAME_SIZE   32
+static int nbFiles=0;
+static int file_block_wr_pt=0;
+int file_block_rd_pt=0;
+char file_block[512];
+static char files[MAX_FILES][MAX_FILENAME_SIZE];
+
 // ****************************************
 // Audio code
 // ****************************************
 static AudioPlaySID playSID;
-static u8 prev_sid_reg[26];
+static u8 prev_sid_reg[32];
 
 // This is called at 31.7KHz => 31777 times per sec
 void __not_in_flash("LineCall") LineCall(void)
@@ -191,8 +213,8 @@ static void audio_fill_buffer( audio_sample * stream, int len )
 
 static void sid_dump( void )
 {
-  //memcpy((void *)&buffer[0], (void *)&mem[REG_SID_BASE], 26);
-  for(int i=0;i<25;i++) 
+  //memcpy((void *)&buffer[0], (void *)&mem[REG_SID_BASE], 32);
+  for(int i=0;i<32;i++) 
   {
     u8 reg = mem[REG_SID_BASE+i];
     if(reg != prev_sid_reg[i]) {       
@@ -381,7 +403,7 @@ void __not_in_flash("VideoRenderUpdate") VideoRenderUpdate(void)
           colbits += (1<<k);
         }  
       }
-      mem[REG_SPRITE_COLI+i] = colbits; 
+      mem[REG_SPRITE_COL_LO+i] = colbits; 
     }
     sid_dump();
 #ifndef HAS_PETIO
@@ -390,7 +412,6 @@ void __not_in_flash("VideoRenderUpdate") VideoRenderUpdate(void)
 #endif
 #endif
 }
-
 
 void __not_in_flash("VideoRenderLineBG") VideoRenderLineBG(u8 * linebuffer, int scanline)
 {
@@ -677,7 +698,22 @@ static uint8_t cmd_queue_rd=0;
 static uint8_t cmd_queue_wr=0;
 static uint8_t cmd_queue_cnt=0;
 
+
+static int mystrncpy( char* dst, const char* src, int n )
+{
+   int pos = 0;
+   while( (pos<n) && (*src) )
+   {
+    *dst++ = toupper(*src++);
+    pos++;
+   }
+   *dst++=0;
+   return pos+1;
+}
+
+
 static void handleCmdQueue(void) {
+  unsigned int nbread; 
   while (cmd_queue_cnt)
   {
     QueueItem cmd = cmd_queue[cmd_queue_rd];
@@ -695,6 +731,73 @@ static void handleCmdQueue(void) {
         break;
       case cmd_bitmap_clr:
         memset((void*)&Bitmap[0],0, sizeof(Bitmap));
+        break;
+      case cmd_openfile:
+        file_block_wr_pt = 1;
+        nbread = 0; 
+        if( !(f_open(&file, &files[cmd.p8_1][0], FA_READ)) ) {
+          f_read (&file, (void*)&file_block[file_block_wr_pt], 255, &nbread);
+          if (!nbread) f_close(&file);
+        }
+        file_block_wr_pt += nbread; 
+        file_block[0] = nbread;
+        file_block_rd_pt = 0;
+        mem[REG_TSTATUS] = 0; 
+        break;        
+      case cmd_readfile:
+        file_block_wr_pt = 1;
+        nbread = 0; 
+        f_read (&file, (void*)&file_block[file_block_wr_pt], 255, &nbread);
+        if (!nbread) f_close(&file);
+        file_block_wr_pt += nbread; 
+        file_block[0] = nbread;
+        file_block_rd_pt = 0;
+        mem[REG_TSTATUS] = 0; 
+        break;        
+      case cmd_opendir:
+        nbFiles = 0;
+        file_block_wr_pt = 1;
+        fres = f_findfirst(&dir, &entry, "", "*");
+        while ( (fres == FR_OK) && (entry.fname[0]) && (nbFiles<MAX_FILES) ) {  
+          if (!entry.fname[0]) {
+            f_closedir(&dir);
+            break;
+          }
+          if ( !(entry.fattrib & AM_DIR) ) {
+            if (entry.fname[0] != '.' ) {
+              char * filename = entry.fname;
+              strncpy(&files[nbFiles][0], filename, MAX_FILENAME_SIZE-1);
+              file_block_wr_pt += mystrncpy(&file_block[file_block_wr_pt], filename, MAX_FILENAME_SIZE-1);
+              nbFiles++; 
+            }  
+          }
+          fres = f_findnext(&dir, &entry);  
+        }
+        file_block[0] = nbFiles;
+        file_block_rd_pt = 0;
+        mem[REG_TSTATUS] = 0;
+        break;
+      case cmd_readdir:
+        nbFiles = 0;
+        file_block_wr_pt = 1;        
+        while ( (fres == FR_OK) && (entry.fname[0]) && (nbFiles<MAX_FILES) ) {  
+          if (!entry.fname[0]) {
+            f_closedir(&dir);
+            break;
+          }
+          if ( !(entry.fattrib & AM_DIR) ) {
+            if (entry.fname[0] != '.' ) {
+              char * filename = entry.fname;
+              strncpy(&files[nbFiles][0], filename, MAX_FILENAME_SIZE-1);
+              file_block_wr_pt += mystrncpy(&file_block[file_block_wr_pt], filename, MAX_FILENAME_SIZE-1);
+              nbFiles++; 
+            }  
+          }
+          fres = f_findnext(&dir, &entry);  
+        }
+        file_block[0] = nbFiles;
+        file_block_rd_pt = 0;
+        mem[REG_TSTATUS] = 0; 
         break;
       case cmd_a000_bank:
 #ifdef PETIO_A000
@@ -733,9 +836,13 @@ uint8_t __not_in_flash("cmd_params_len") cmd_params_len[MAX_CMD]={
 //       13: bitmap point
 //       14: bitmap tri
 //       15: bitmap rect
+//       27  openfile                 (data=file#)
+//       28  readfile
+//       29  opendir
+//       30  readdir
 //       31  a000_bank                (data=bank#)
  
-  0,3,3,6,4,4,2,2,2, 0,0,0, 0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
+  0,3,3,6,4,4,2,2,2, 0,0,0, 0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1
 }; 
 
 static void __not_in_flash("traParamFuncDummy") traParamFuncDummy(void){
@@ -818,7 +925,23 @@ static void __not_in_flash("traParamFuncExecuteCommand") traParamFuncExecuteComm
       break;
     case cmd_bitmap_clr:
       pushCmdQueue({cmd_bitmap_clr});
-      break;      
+      break;
+    case cmd_openfile:
+      mem[REG_TSTATUS] = 1; 
+      pushCmdQueue({cmd_openfile,cmd_params[0]});
+      break;
+    case cmd_readfile:
+      mem[REG_TSTATUS] = 1; 
+      pushCmdQueue({cmd_readfile});
+      break;
+    case cmd_opendir:
+      mem[REG_TSTATUS] = 1; 
+      pushCmdQueue({cmd_opendir});
+      break;
+    case cmd_readdir:
+      mem[REG_TSTATUS] = 1; 
+      pushCmdQueue({cmd_readdir});
+      break;
     case cmd_a000_bank:
       pushCmdQueue({cmd_a000_bank,cmd_params[0]});
       break;
@@ -948,6 +1071,9 @@ static void __not_in_flash("handle_custom_registers") handle_custom_registers(ui
     case REG_TCOMMAND:
       cmd_param_ind = 0;
       cmd = value & (MAX_CMD-1);
+      if (!cmd_params_len[cmd]) {
+        traParamFuncPtr[cmd]();
+      }
       break;
     case REG_TPARAMS:
       if (cmd_param_ind < MAX_PAR) cmd_params[cmd_param_ind++]=value;
@@ -1079,6 +1205,9 @@ uint8_t readWord( uint16_t location)
     }  
   }
   else if (location < 0xa000) {
+    if (location == 0x9b13 ) {
+      return file_block[file_block_rd_pt++];
+    }  
     return mem[location-0x8000];
   }  
   else if (location < 0xb000) {
@@ -1241,6 +1370,7 @@ static void pet_kup(uint8_t asciicode) {
 
 
 #ifndef HAS_PETIO
+#ifdef HAS_USBHOST
 // ****************************************
 // USB keyboard
 // ****************************************
@@ -1301,7 +1431,7 @@ void kbd_signal_raw_key (int keycode, int code, int codeshifted, int flags, int 
   }
 }
 #endif
-
+#endif
 
 #ifndef HAS_PETIO
 #ifdef HAS_NETWORK
@@ -1449,8 +1579,6 @@ static const struct tftp_context tftp = {
 #endif
 #endif
 
-
-
 // ****************************************
 // Main
 // ****************************************
@@ -1473,6 +1601,8 @@ int main()
     tftp_init_common(LWIP_TFTP_MODE_SERVER, &tftp);
   }   
 #endif
+
+#ifdef HAS_USBHOST
   printf("Init USB...\n");
   
   board_init();
@@ -1481,7 +1611,33 @@ int main()
   // init host stack on configured roothub port
   tuh_init(BOARD_TUH_RHPORT);
 #endif
+#endif
 
+
+  fres = f_mount(&filesystem, "/", 1);
+  if (fres != FR_OK) {
+      printf("f_mount fail rc=%d\n", fres);
+      while (1) {};
+  }
+/*
+  FIL fp;
+  res = f_open(&fp, "back2pet.prg", FA_READ);
+  if (res == FR_OK) {
+    
+      uint8_t buffer[512];
+      UINT length;
+      //memset(buffer, 0, sizeof(buffer));
+      f_read(&fp, buffer, sizeof(buffer), &length);
+      printf("%s", buffer);
+      f_close(&fp);
+      
+  } else {
+      printf("can't open README.txt: %d\n", res);
+      while (1) {};
+  }
+   
+  f_unmount("/");
+*/
   memset((void*)&Bitmap[0],0, sizeof(Bitmap));
 
 #ifndef HAS_PETIO
@@ -1499,7 +1655,7 @@ int main()
   //AudioRenderInit();
 
 #ifdef PETIO_A000
-  memcpy((void *)&mem_a000[0], (void *)&vsync[0], 0x1000);
+  memcpy((void *)&mem_a000[0], (void *)a000_rom_list[0], 0x1000);
 #endif 
 
 #ifdef HAS_PETIO
@@ -1531,6 +1687,7 @@ int main()
       SystemReset();
     }
     WaitVSync();
+#ifdef HAS_USBHOST
     // tinyusb host task
     tuh_task();
 #if CFG_TUH_CDC
@@ -1538,6 +1695,7 @@ int main()
 #endif
 #if CFG_TUH_HID
     hid_app_task();
+#endif
 #endif
     if (pet_running)
     {

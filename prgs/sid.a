@@ -12,6 +12,7 @@
         !byte $00
 bas_end !word $00
 
+REG_SIDBASE    = $9b18
 
 
 *= $0800
@@ -80,13 +81,13 @@ initmusic =*
   bne -
 
   lda #$00         ;clear control regs
-  sta $9f04
-  sta $9f0b
-  sta $9f12
-  sta $9f17
+  sta REG_SIDBASE+$04
+  sta REG_SIDBASE+$0b
+  sta REG_SIDBASE+$12
+  sta REG_SIDBASE+$17
 
   lda #$0f         ;full volume
-  sta $9f18
+  sta REG_SIDBASE+$18
 
   lda #$40         ;flag init music
   sta mstatus
@@ -130,12 +131,12 @@ moff =*
 
   bvc +            ;if mstatus $c0 then
   lda #$00
-  sta $9f04        ;kill voice 1,2,3
-  sta $9f0b        ;control registers
-  sta $9f12
+  sta REG_SIDBASE+$04        ;kill voice 1,2,3
+  sta REG_SIDBASE+$0b        ;control registers
+  sta REG_SIDBASE+$12
 
   lda #$0f         ;full volume still
-  sta $9f18
+  sta REG_SIDBASE+$18
 
   lda #$80         ;flag no need to kill
   sta mstatus      ;sound next time
@@ -280,10 +281,10 @@ getpitch =*
   sta tempfreq     ;base frequency
   lda frequenzhi,y
   ldy tmpregofst
-  sta $9f01,y
+  sta REG_SIDBASE+$01,y
   sta savefreqhi,x
   lda tempfreq
-  sta $9f00,y
+  sta REG_SIDBASE+$00,y
   sta savefreqlo,x
   jmp +
 
@@ -307,19 +308,19 @@ appendnote =*
   sta tempctrl
   lda instr+2,x
   and appendfl     ;implement append
-  sta $9f04,y
+  sta REG_SIDBASE+$04,y
 
   lda instr+0,x    ;get pulse width lo
-  sta $9f02,y
+  sta REG_SIDBASE+$02,y
 
   lda instr+1,x    ;get pulse width hi
-  sta $9f03,y
+  sta REG_SIDBASE+$03,y
 
   lda instr+3,x    ;get attack/decay
-  sta $9f05,y
+  sta REG_SIDBASE+$05,y
 
   lda instr+4,x    ;get sustain/release
-  sta $9f06,y
+  sta REG_SIDBASE+$06,y
 
   ldx tempstore    ;save control reg val
   lda tempctrl
@@ -368,10 +369,10 @@ soundwork =*
 
   lda voicectrl,x  ;length exceeded so
   and #$fe         ;start the release
-  sta $9f04,y      ;and kill adsr
+  sta REG_SIDBASE+$04,y      ;and kill adsr
   lda #$00
-  sta $9f05,y
-  sta $9f06,y
+  sta REG_SIDBASE+$05,y
+  sta REG_SIDBASE+$06,y
 
 
 ;vibrato routine
@@ -444,9 +445,9 @@ vibrato =*
 
 + ldy tmpregofst   ;save the final
   lda tmpvfrqlo    ;frequencies
-  sta $9f00,y
+  sta REG_SIDBASE+$00,y
   lda tmpvfrqhi
-  sta $9f01,y
+  sta REG_SIDBASE+$01,y
 
 
 ;pulse-width timbre routine
@@ -510,10 +511,10 @@ dumpulse =*
   ldx tmpregofst   ;chip and back into
   pla              ;the instr data str
   sta instr+1,y
-  sta $9f03,x
+  sta REG_SIDBASE+$03,x
   pla
   sta instr+0,y
-  sta $9f02,x
+  sta REG_SIDBASE+$02,x
   ldx tempstore
 
 
@@ -538,11 +539,11 @@ portamento =*
   lda savefreqlo,x ;sub portaval from
   sbc tempstore    ;current frequency
   sta savefreqlo,x
-  sta $9f00,y
+  sta REG_SIDBASE+$00,y
   lda savefreqhi,x
   sbc #$00         ;(word arithmetic)
   sta savefreqhi,x
-  sta $9f01,y
+  sta REG_SIDBASE+$01,y
   jmp drums
 
 portup =*
@@ -551,11 +552,11 @@ portup =*
   lda savefreqlo,x ;add portval to
   adc tempstore    ;current frequency
   sta savefreqlo,x
-  sta $9f00,y
+  sta REG_SIDBASE+$00,y
   lda savefreqhi,x
   adc #$00
   sta savefreqhi,x
-  sta $9f01,y
+  sta REG_SIDBASE+$01,y
 
 
 ;bit0 instrfx are the drum routines
@@ -591,7 +592,7 @@ drums =*
 
   lda savefreqhi,x ;not the first time
   dec savefreqhi,x ;so dec freqhi for
-  sta $9f01,y      ;drum sound
+  sta REG_SIDBASE+$01,y      ;drum sound
 
   lda voicectrl,x  ;if ctrlreg is 0 then
   and #$fe         ;noise is used always
@@ -600,12 +601,12 @@ drums =*
 firstime =*
 
   lda savefreqhi,x ;noise is used for
-  sta $9f01,y      ;the first vbl also
+  sta REG_SIDBASE+$01,y      ;the first vbl also
   lda #$80         ;(set noise)
 
 dumpctrl =*
 
-  sta $9f04,y
+  sta REG_SIDBASE+$04,y
 
 
 ;bit1 instrfx is the skydive
@@ -627,7 +628,7 @@ skydive =*
 
   dec savefreqhi,x ;decr and save the
   ldy tmpregofst   ;high byte freq
-  sta $9f01,y
+  sta REG_SIDBASE+$01,y
 
 
 ;bit2 instrfx is an octave arpeggio
@@ -656,9 +657,9 @@ octarp =*
   sta tempfreq
   lda frequenzhi,y
   ldy tmpregofst
-  sta $9f01,y
+  sta REG_SIDBASE+$01,y
   lda tempfreq
-  sta $9f00,y
+  sta REG_SIDBASE+$00,y
 
 
 ;==========

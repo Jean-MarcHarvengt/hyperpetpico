@@ -24,6 +24,8 @@ include_directories(_petbus)
 include_directories(_network)
 include_directories(_usb_kbd)
 include_directories(_pucrunch)
+include_directories(_flashfs)
+include_directories(_flashfs/fatfs)
 
 if( ${TARGET} MATCHES "hyperpetpicopetio" )
 add_compile_definitions(${TARGET} PUBLIC HAS_PETIO=1)
@@ -82,6 +84,13 @@ set(PUCRUNCH_SOURCES
 		_pucrunch/decrunch.c
 	)
 
+set(FF_SOURCES
+		_flashfs/flash.c
+		_flashfs/fatfs_driver.c
+		_flashfs/fatfs/ff.c
+		_flashfs/fatfs/ffsystem.c
+		_flashfs/fatfs/ffunicode.c
+	)
 
 add_executable(${TARGET}
 		${MAIN_SOURCES}
@@ -92,6 +101,7 @@ add_executable(${TARGET}
 		${PETBUS_SOURCES}
 		${PUCRUNCH_SOURCES}		
 		${NETWORK_SOURCES}
+		${FF_SOURCES}
 		${USB_SOURCES}
 	)
 

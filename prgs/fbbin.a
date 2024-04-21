@@ -1,0 +1,394 @@
+!to "fb.bin"
+
+; mode
+REG_VIDEO_MODE    = $9b00
+; 0-1: resolution (0=64$200,1=32$200,2=256x200)
+
+REG_TCOMMAND      = $9b11
+; 1: transfer tiles data      (data=tilenr,64/packet pixels)
+; 2: transfer sprites data    (data=spritenr,384/packet pixels)
+; 3: transfer bitmap data     (data=xh,xl,y,wh,wl,h,w*h/packet pixels) 
+; 4: transfer t/fmap col data (data=layer,col,row,size,size/packet tiles)
+; 5: transfer t/fmap row data (data=layer,col,row,size,size/packet tiles)
+REG_TPARAMS       = $9b12
+REG_TDATA         = $9b13
+REG_TSTATUS       = $9b14
+
+ROWLEN     = 80
+ROWLEN_LO  = 40
+ROWLEN_HI  = 80
+
+*= $a000
+        lda #0                  ; hires
+        sta REG_VIDEO_MODE
+
+        jsr clear_screen        ; clear screen
+        lda #ROWLEN_HI          ; init offset table
+        jsr initlineoffset      
+
+loop:
+        lda #29                 ; cmd_opendir
+        sta REG_TCOMMAND
+waitstatusdone:
+        lda REG_TSTATUS
+        bne waitstatusdone
+        lda REG_TDATA
+        beq no_files
+        sta nbfiles             ; nb of files     
+        tax
+        lda #<filenames         ; dst lo
+        sta loc+1
+        lda #>filenames         ; dst hi
+        sta loc+2
+
+nextfile:                       ; read DIR filenames char by char
+        ldy #0
+nextchar:
+        lda REG_TDATA
+        beq endfilename
+loc:    sta $8090,y
+        iny
+        jmp nextchar        
+endfilename:
+        clc
+        lda loc+1
+        adc #32
+        sta loc+1
+        bcc hic             
+        inc loc+2          
+hic:
+        dex
+        bne nextfile
+        jsr print_file_menu
+
+WAIT_KEY
+        jsr $FFE4               ; Calling KERNAL GETIN 
+        beq WAIT_KEY
+        sta $8000
+        cmp #$1d                ; =>   next page
+        beq nextpage
+        cmp #$0d
+        beq exit
+        cmp #$14                ; BACK reset
+        bne WAIT1
+        jmp ($fffc)
+WAIT1:        
+        cmp #$20                ; SPC  LORES
+        bne WAIT2
+        lda #1                  ; go to 40 column
+        sta REG_VIDEO_MODE
+        jsr clear_screen
+        lda #ROWLEN_LO
+        jsr initlineoffset
+        jsr print_file_menu
+        jmp WAIT_KEY
+WAIT2:        
+        cmp #$30
+        bmi WAIT_KEY
+        cmp #$40
+        bpl WAIT_KEY
+        sbc #$30
+        cmp nbfiles
+        bpl WAIT_KEY
+        jsr load_file
+exit        
+        jsr clear_screen        ; clear screen
+
+        rts 
+
+no_files:
+        jsr clear_screen        ; clear screen
+        jmp loop
+
+nextpage:
+        jsr clear_files        
+        lda #30                 ; cmd_nextdir
+        sta REG_TCOMMAND
+        jmp waitstatusdone
+
+
+;-------------------------------------------------------------
+clear_screen:
+        ldx #$00                ; clear screen 
+clear:
+        lda #32
+        sta $8000,x
+        sta $8100,x
+        sta $8200,x
+        sta $8300,x
+        sta $8400,x
+        sta $8500,x
+        sta $8600,x
+        sta $8700,x
+        dex
+        bne clear
+        rts
+
+;-------------------------------------------------------------
+clear_files:
+        ldx #31                 ; clear file buffer 
+clear_f:
+        lda #0
+        sta filenames,x
+        sta filenames+1*32,x
+        sta filenames+2*32,x
+        sta filenames+3*32,x
+        sta filenames+4*32,x
+        sta filenames+5*32,x
+        sta filenames+6*32,x
+        sta filenames+7*32,x
+        sta filenames+8*32,x
+        sta filenames+9*32,x
+        dex
+        bpl clear_f
+        rts
+
+;-------------------------------------------------------------
+initlineoffset:
+        sta rowlen+1
+        lda #$00                ; $8000
+        sta $54
+        lda #$80
+        sta $55
+        ldx #00                 ; line #
+init1:        
+        lda $54                 ; store lo and hi offset
+        sta linelo,x
+        lda $55
+        sta linehi,x
+        clc
+        lda $54
+rowlen: adc #ROWLEN
+        sta $54
+        bcc init2             
+        inc $55          
+init2:
+        inx
+        cpx #25
+        bne init1
+        rts
+ 
+;-------------------------------------------------------------
+print_tab:    
+        pha                             ; print TEXT at 1 TAB 
+        lda #3
+        jmp print0
+print:
+        pha                             ; print TEXT 
+        lda #0
+print0:
+        clc
+        adc linelo,y                    ; dst lo
+        sta addr+1
+        lda linehi,y                    ; dst hi
+        sta addr+2
+        bcc print1
+        inc addr+2
+print1
+        pla
+        sta $54                         ; src text lo 
+        txa                             ; src text hi
+        sta $55
+        ldy #$00
+print2
+        lda ($54),y
+        beq pr_end
+        cmp #65                         ; 32
+        bmi addr
+        clc
+        sbc #$3f
+addr    sta $8000,y
+        iny
+        bne print2
+pr_end
+        rts
+
+;-------------------------------------------------------------
+print_numbers:                  
+        ldx #0                  ; y = start row
+pri_num0
+        lda linelo,y            ; dst lo
+        sta addrr+1
+        lda linehi,y            ; dst hi
+        sta addrr+2
+        lda numbers,x
+addrr   sta $8000               ; store digit
+        iny                  
+        inx
+        cpx #10
+        bne pri_num0        
+        rts
+
+;-------------------------------------------------------------
+print_file_menu:
+        jsr clear_screen        ; clear screen
+        lda #<header            ; header/title
+        ldx #>header
+        ldy #0
+        jsr print
+        lda #<footer1           ; footer1
+        ldx #>footer1
+        ldy #13
+        jsr print        
+        lda #<footer2           ; footer2
+        ldx #>footer2
+        ldy #14
+        jsr print        
+        ldy #2                  ; print numbers of each row
+        jsr print_numbers
+        lda #<line0             ; print 10 filenames list
+        ldx #>line0
+        ldy #2
+        jsr print_tab
+        lda #<line1
+        ldx #>line1
+        ldy #3
+        jsr print_tab
+        lda #<line2
+        ldx #>line2
+        ldy #4
+        jsr print_tab
+        lda #<line3
+        ldx #>line3
+        ldy #5
+        jsr print_tab
+        lda #<line4
+        ldx #>line4
+        ldy #6
+        jsr print_tab
+        lda #<line5
+        ldx #>line5
+        ldy #7
+        jsr print_tab
+        lda #<line6
+        ldx #>line6
+        ldy #8
+        jsr print_tab
+        lda #<line7
+        ldx #>line7
+        ldy #9
+        jsr print_tab
+        lda #<line8
+        ldx #>line8
+        ldy #10
+        jsr print_tab
+        lda #<line9
+        ldx #>line9
+        ldy #11
+        jsr print_tab
+        rts
+
+
+;-------------------------------------------------------------
+load_file:
+        pha
+        lda #27                 ; cmd_openfile
+        sta REG_TCOMMAND
+        pla
+        sta REG_TPARAMS         ; file index
+
+waitstatusdone1:
+        lda REG_TSTATUS
+        bne waitstatusdone1
+        lda REG_TDATA
+        beq exiterr
+
+        tax                     ; nb bytes
+        lda REG_TDATA           ; start address lo
+        sta $54
+        lda REG_TDATA           ; start address hi
+        sta $55
+        dex
+        dex
+
+load0:
+        ldy #00                 ; index
+load1:        
+        lda REG_TDATA           ; read data byte        
+        sta ($54),y             ; store it 
+
+        clc
+        lda $54
+        adc #1
+        sta $54
+        bcc load2             
+        inc $55          
+load2:    
+        dex
+        bne load1
+            
+        lda #28                 ; cmd_readfile
+        sta REG_TCOMMAND
+waitstatusdone2:
+        lda REG_TSTATUS
+        bne waitstatusdone2
+        lda REG_TDATA           ; nb bytes
+        tax
+        bne load0
+
+exiterr:
+
+        lda $28
+        sta $c7
+        lda $29
+        sta $c8
+
+        lda $54
+        sta $2a
+        sta $2c
+        sta $2e
+        sta $c9
+        lda $55
+        sta $2b
+        sta $2d
+        sta $2f
+        sta $ca
+
+        rts
+
+;-------------------------------------------------------------
+linelo:
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+linehi:
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+nbfiles:
+!byte 0
+
+numbers
+!text "1234567890"
+
+header
+!text "FILE BROWSER 1.0, SELECT FILE:   "
+!byte 0
+footer1
+!text "RIGHT=PAGE RET=EXIT SPC=LORES DEL=RESET"
+!byte 0
+footer2
+!text "(0-9) LOAD FILE"
+!byte 0
+
+filenames:
+line0:
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+line1:
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+line2:
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+line3:
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+line4:
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+line5:
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+line6:
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+line7:
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+line8:
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+line9:
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+
+
