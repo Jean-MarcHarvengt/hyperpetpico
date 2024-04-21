@@ -31,6 +31,8 @@ extern "C" void hid_app_task(void);
 #endif
 #include "decrunch.h"
 
+#include <stdio.h>
+#include <ctype.h>
 #include "flash.h"
 #include "ff.h"
 
