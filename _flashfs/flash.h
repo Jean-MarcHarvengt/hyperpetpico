@@ -1,13 +1,10 @@
 #ifndef _FLASH_H_
 #define _FLASH_H_
 
-#include <ctype.h>
-#include <math.h>
-#include <hardware/flash.h>
-#include <hardware/sync.h>
+//#include <ctype.h>
 #include <pico/stdlib.h>
-#include <stdio.h>
-#include <string.h>
+//#include <stdio.h>
+
 
 #define FAT_BLOCK_NUM          2880  // 1.44 MB floppy
 #define FAT_BLOCK_SIZE         512

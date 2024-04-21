@@ -742,7 +742,6 @@ static void handleCmdQueue(void) {
         file_block_wr_pt += nbread; 
         file_block[0] = nbread;
         file_block_rd_pt = 0;
-        mem[REG_TSTATUS] = 0; 
         break;        
       case cmd_readfile:
         file_block_wr_pt = 1;
@@ -752,7 +751,6 @@ static void handleCmdQueue(void) {
         file_block_wr_pt += nbread; 
         file_block[0] = nbread;
         file_block_rd_pt = 0;
-        mem[REG_TSTATUS] = 0; 
         break;        
       case cmd_opendir:
         nbFiles = 0;
@@ -775,7 +773,6 @@ static void handleCmdQueue(void) {
         }
         file_block[0] = nbFiles;
         file_block_rd_pt = 0;
-        mem[REG_TSTATUS] = 0;
         break;
       case cmd_readdir:
         nbFiles = 0;
@@ -797,7 +794,6 @@ static void handleCmdQueue(void) {
         }
         file_block[0] = nbFiles;
         file_block_rd_pt = 0;
-        mem[REG_TSTATUS] = 0; 
         break;
       case cmd_a000_bank:
 #ifdef PETIO_A000
@@ -806,7 +802,8 @@ static void handleCmdQueue(void) {
         break;        
       default:
         break;
-    }  
+    }
+    mem[REG_TSTATUS] = 0;
   }  
 }
 
@@ -914,37 +911,20 @@ static void __not_in_flash("traParamFuncPackedBitmap") traParamFuncPackedBitmap(
 static void __not_in_flash("traParamFuncExecuteCommand") traParamFuncExecuteCommand(void){
   switch (cmd) 
   {
+/*
     case cmd_transfer_packed_tile_data:
       pushCmdQueue({cmd_unpack_tiles});
       break;
     case cmd_transfer_packed_sprite_data:
       pushCmdQueue({cmd_unpack_sprites});
       break;
+*/      
     case cmd_transfer_packed_bitmap_data:
       pushCmdQueue({cmd_unpack_bitmap});
       break;
-    case cmd_bitmap_clr:
-      pushCmdQueue({cmd_bitmap_clr});
-      break;
-    case cmd_openfile:
+    default:
       mem[REG_TSTATUS] = 1; 
-      pushCmdQueue({cmd_openfile,cmd_params[0]});
-      break;
-    case cmd_readfile:
-      mem[REG_TSTATUS] = 1; 
-      pushCmdQueue({cmd_readfile});
-      break;
-    case cmd_opendir:
-      mem[REG_TSTATUS] = 1; 
-      pushCmdQueue({cmd_opendir});
-      break;
-    case cmd_readdir:
-      mem[REG_TSTATUS] = 1; 
-      pushCmdQueue({cmd_readdir});
-      break;
-    case cmd_a000_bank:
-      pushCmdQueue({cmd_a000_bank,cmd_params[0]});
-      break;
+      pushCmdQueue({cmd,cmd_params[0]});
   }
 }
 
