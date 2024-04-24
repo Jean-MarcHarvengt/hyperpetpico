@@ -149,12 +149,14 @@ static void __not_in_flash("write89000") write89000(uint32_t address, uint8_t va
         if (!tra_h) {
           switch (cmd) 
           {
+            /*
             case cmd_transfer_packed_tile_data:
               pushCmdQueue({cmd_unpack_tiles});
               break;
             case cmd_transfer_packed_sprite_data:
               pushCmdQueue({cmd_unpack_sprites});
               break;
+            */  
             case cmd_transfer_packed_bitmap_data:
               pushCmdQueue({cmd_unpack_bitmap});
               break;
@@ -221,21 +223,19 @@ static void __not_in_flash("writeFuncTable") (*writeFuncTable[16])(uint32_t,uint
 ********************************/ 
 void __not_in_flash("__time_critical_func") petbus_loop(void) {
   for(;;) {
-    uint32_t allgpios = sio_hw->gpio_in; 
-    if ((allgpios & VALID_CYCLE) == VALID_CYCLE) {
+    //uint32_t allgpios = sio_hw->gpio_in; 
+    //if ((allgpios & VALID_CYCLE) == VALID_CYCLE) {
       uint32_t value = pio_sm_get_blocking(pio, sm);
       const bool is_write = ((value & (1u << (CONFIG_PIN_PETBUS_RW - CONFIG_PIN_PETBUS_DATA_BASE))) == 0);
       uint16_t address = (value >> 9) & 0xffff;      
       if (is_write)
       {
-        void (*writeFunc)(uint32_t,uint8_t) = writeFuncTable[address>>12];
-        writeFunc(address, value & 0xff);
+        writeFuncTable[address>>12](address, value & 0xff);
       }
       else {
-        void (*readFunc)(uint32_t) = readFuncTable[address>>12];
-        readFunc(address);
+        readFuncTable[address>>12](address);
       }      
-    }
+    //}
   }
 }
 

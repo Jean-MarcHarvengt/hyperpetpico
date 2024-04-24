@@ -910,9 +910,10 @@ static void __not_in_flash("traParamFuncPackedBitmap") traParamFuncPackedBitmap(
   tra_address = &TileData[0];
 }
 
+
+
 static void __not_in_flash("traParamFuncExecuteCommand") traParamFuncExecuteCommand(void){
-  switch (cmd) 
-  {
+  mem[REG_TSTATUS] = 1; 
 /*
     case cmd_transfer_packed_tile_data:
       pushCmdQueue({cmd_unpack_tiles});
@@ -921,13 +922,22 @@ static void __not_in_flash("traParamFuncExecuteCommand") traParamFuncExecuteComm
       pushCmdQueue({cmd_unpack_sprites});
       break;
 */      
-    case cmd_transfer_packed_bitmap_data:
-      pushCmdQueue({cmd_unpack_bitmap});
-      break;
-    default:
-      mem[REG_TSTATUS] = 1; 
-      pushCmdQueue({cmd,cmd_params[0]});
-  }
+  if (cmd_queue_cnt != 256)
+  {
+    cmd_queue[cmd_queue_wr] = {cmd};
+    cmd_queue_wr = (cmd_queue_wr + 1)&(CMD_QUEUE_SIZE-1);
+    cmd_queue_cnt++;
+  } 
+}
+
+static void __not_in_flash("traParamFuncExecuteCommand1") traParamFuncExecuteCommand1(void){
+  mem[REG_TSTATUS] = 1; 
+  if (cmd_queue_cnt != 256)
+  {
+    cmd_queue[cmd_queue_wr] = {cmd,cmd_params[0]};
+    cmd_queue_wr = (cmd_queue_wr + 1)&(CMD_QUEUE_SIZE-1);
+    cmd_queue_cnt++;
+  } 
 }
 
 
@@ -960,11 +970,11 @@ void __not_in_flash("traParamFuncPtr") (*traParamFuncPtr[MAX_CMD])(void) = {
   traParamFuncExecuteCommand,
   traParamFuncExecuteCommand,
   traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand1,
   traParamFuncExecuteCommand,
   traParamFuncExecuteCommand,
   traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand
+  traParamFuncExecuteCommand1
 };
 
 static void __not_in_flash("traDataFunc8nolut") traDataFunc8nolut(uint8_t val) {
