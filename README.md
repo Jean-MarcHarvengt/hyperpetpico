@@ -15,8 +15,8 @@ At this point of time, the hyperpetpico project supports:<br>
 * 320x200 bitmap mode (256 colors) on the lower layer
 * background color/raster colors
 * extra 4K RAM in $a000 (so far 1 bank, may be more in future!)
-* pluggable ROM in $a000 via resident menu loader (sys36864 +sys40960) 
-* [No storage is offered!]
+* pluggable ROM in $a000 via resident menu loader (sys36864) 
+* 720K flash storage (ro) with file browser (sys40960)
 
 <br>
 
@@ -31,7 +31,7 @@ Programs can be loaded (via tape emulation, or modern devices as PETdisk or PETd
 As soon a program make uses of extended graphics capabilities, only VGA is usable<br>
 The rest of the PET hardware is just used for its CPU,RAM,ROM,keyboard,PIA,VIA ...<br>
 New registers are available through 9000-9fff region (R/W)<br>
-Region a000-afff is available as extra RAM or to store custom roms.
+Region a000-afff is available as extra RAM or to store custom roms (file browser default).
 
 <br>
 
@@ -80,6 +80,6 @@ Hyperpetpico reuse or is inspired from the code of below projects
 * [Pucrunch compressor for 6502 CPU](https://github.com/mist64/pucrunch)
 * [reSID emulator](https://en.wikipedia.org/wiki/ReSID)
 * [Teensy-reSID](https://github.com/FrankBoesing/Teensy-reSID)
-
+* [A8PicoCart]( (https://github.com/robinhedwards/A8PicoCart)
 * [MOS6502](https://github.com/gianlucag/mos6502)
 
