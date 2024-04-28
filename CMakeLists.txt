@@ -115,6 +115,7 @@ target_link_libraries(${TARGET}
 	hardware_pio
         hardware_pwm
         hardware_dma
+        hardware_flash
 	)
 
 if( NOT ${TARGET} MATCHES "hyperpetpicopetio" )
