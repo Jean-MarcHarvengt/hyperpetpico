@@ -85,12 +85,13 @@ set(PUCRUNCH_SOURCES
 	)
 
 set(FF_SOURCES
-		_flashfs/flash.c
-		_flashfs/fatfs_driver.c
-		_flashfs/fatfs/ff.c
-		_flashfs/fatfs/ffsystem.c
+#		_flashfs/flash.c
+		_flashfs/fatfs_disk_ro.c
+		_flashfs/fatfs/ff.c	
+		_flashfs/fatfs/diskio.c
 		_flashfs/fatfs/ffunicode.c
 	)
+
 
 add_executable(${TARGET}
 		${MAIN_SOURCES}
@@ -129,6 +130,7 @@ target_link_libraries(${TARGET}
         pico_lwip_tftp
 	)
 endif()
+
 
 target_include_directories(${TARGET} PRIVATE ${CMAKE_CURRENT_LIST_DIR} )
 

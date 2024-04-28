@@ -4,6 +4,7 @@
 REG_VIDEO_MODE    = $9b00
 ; 0-1: resolution (0=64$200,1=32$200,2=256x200)
 
+REG_TLOOKUP       = $9a00
 REG_TCOMMAND      = $9b11
 ; 1: transfer tiles data      (data=tilenr,64/packet pixels)
 ; 2: transfer sprites data    (data=spritenr,384/packet pixels)
@@ -20,28 +21,31 @@ ROWLEN_HI  = 80
 
 *= $a000
         jsr clear_screen        ; clear screen
+        jsr clear_files 
     
 loop:
         lda #29                 ; cmd_opendir
         sta REG_TCOMMAND
-        nop
 waitstatusdone:
         lda REG_TSTATUS
-        nop
         bne waitstatusdone
-        lda REG_TDATA
+
+        lda REG_TLOOKUP
         beq no_files
-        sta nbfiles             ; nb of files     
-        tax
+        sta nbfiles             ; nb of files
+
         lda #<filenames         ; dst lo
         sta loc+1
         lda #>filenames         ; dst hi
         sta loc+2
-
+        ldx #0
+        lda #0
 nextfile:                       ; read DIR filenames char by char
+        pha
         ldy #0
 nextchar:
-        lda REG_TDATA
+        inx
+        lda REG_TLOOKUP,x
         beq endfilename
 loc:    sta $8090,y
         iny
@@ -54,7 +58,10 @@ endfilename:
         bcc hic             
         inc loc+2          
 hic:
-        dex
+        clc
+        pla
+        adc #1
+        cmp nbfiles
         bne nextfile
         jsr print_file_menu
 
@@ -71,9 +78,12 @@ WAIT_KEY
 WAIT1:        
         cmp #$20                ; SPC  LORES
         bne WAIT2
-        lda #1                  ; go to 40 column
+        lda REG_VIDEO_MODE      ; go to 40 column if in 80 colums
+        bne WAIT_KEY
+        lda #1
         sta REG_VIDEO_MODE
         jsr clear_screen
+        ;jsr install_anyhz
         jsr print_file_menu
         jmp WAIT_KEY
 WAIT2:        
@@ -85,14 +95,15 @@ WAIT2:
         cmp nbfiles
         bpl WAIT_KEY
         jsr load_file
-exit        
-        jsr clear_screen        ; clear screen
-
-        rts 
+        jmp clear_screen
 
 no_files:
         jsr clear_screen        ; clear screen
         jmp loop
+
+exit        
+        jsr clear_screen        ; clear screen
+        rts 
 
 nextpage:
         jsr clear_files        
@@ -117,6 +128,24 @@ clear1:
         beq clearhi             ; hires
         lda #ROWLEN_LO          ; init offset table for 40col
         jsr initlineoffset
+        jmp install_anyhz
+        ;rts
+clearhi:
+        lda #32
+        ldx #$00                ; clear screen remaining for 80col  
+clear2:
+        sta $8400,x
+        sta $8500,x
+        sta $8600,x
+        sta $8700,x
+        dex
+        bne clear2
+        lda #ROWLEN_HI          ; init offset table for 80col
+        jsr initlineoffset 
+        rts
+
+;-------------------------------------------------------------
+install_anyhz:
         ldx #$00                ; copy anyhz to videomem  
 copy1:
         lda anyhz,x
@@ -135,21 +164,6 @@ copy2:
         cpx #91
         bne copy2
         jsr $8454               ; call init
-        rts
-clearhi:
-        lda #32
-        ldx #$00                ; clear screen remaining for 80col  
-clear2:
-        sta $8400,x
-        sta $8500,x
-        sta $8600,x
-        sta $8700,x
-        dex
-        bne clear2
-
-        lda #ROWLEN_HI          ; init offset table for 80col
-        jsr initlineoffset 
-
         rts
 
 ;-------------------------------------------------------------
@@ -243,7 +257,7 @@ pri_num0
 addrr   sta $8000               ; store digit
         iny                  
         inx
-        cpx #10
+        cpx nbfiles
         bne pri_num0        
         rts
 
@@ -309,53 +323,77 @@ print_file_menu:
 
 ;-------------------------------------------------------------
 load_file:
+        sei
         pha
+        ldx #0
+copycode:
+        lda code,x
+        sta $8000,x
+        inx
+        bne copycode
+        jmp $8000
+
+code:
         lda #27                 ; cmd_openfile
         sta REG_TCOMMAND
         pla
         sta REG_TPARAMS         ; file index
 
 waitstatusdone1:
-        nop
         lda REG_TSTATUS
         bne waitstatusdone1
-        lda REG_TDATA
-        beq exiterr
-
-        tax                     ; nb bytes
-        lda REG_TDATA           ; start address lo
+        lda REG_TLOOKUP         ; nb bytes
+        beq exitload
+        sta nbbytes             
+        lda REG_TLOOKUP+1       ; start address lo
         sta $54
-        lda REG_TDATA           ; start address hi
+        lda REG_TLOOKUP+2       ; start address hi
         sta $55
-        dex
-        dex
-
-load0:
+        dec nbbytes
+        dec nbbytes
         ldy #00                 ; index
+        ldx #00
 load1:        
-        lda REG_TDATA           ; read data byte        
+        lda REG_TLOOKUP+3,x     ; read data byte        
         sta ($54),y             ; store it 
-
         clc
         lda $54
         adc #1
         sta $54
         bcc load2             
         inc $55          
-load2:    
-        dex
+load2:   
+        inx
+        cpx nbbytes
         bne load1
-            
+        
+nextblock:
         lda #28                 ; cmd_readfile
         sta REG_TCOMMAND
 waitstatusdone2:
         lda REG_TSTATUS
         bne waitstatusdone2
-        lda REG_TDATA           ; nb bytes
-        tax
-        bne load0
+        lda REG_TLOOKUP         ; nb bytes
+        sta nbbytes 
+        beq exitload
+        ldy #00                 ; index
+        ldx #00
+load3:        
+        lda REG_TLOOKUP+1,x     ; read data byte        
+        sta ($54),y             ; store it 
+        clc
+        lda $54
+        adc #1
+        sta $54
+        bcc load4             
+        inc $55          
+load4:    
+        inx
+        cpx nbbytes
+        bne load3
+        beq nextblock
 
-exiterr:
+exitload:
 
         lda $28
         sta $c7
@@ -373,6 +411,7 @@ exiterr:
         sta $2f
         sta $ca
 
+        cli
         rts
 
 ;-------------------------------------------------------------
@@ -382,6 +421,8 @@ linehi:
 !byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 
 nbfiles:
+!byte 0
+nbbytes:
 !byte 0
 
 numbers
@@ -473,6 +514,5 @@ anyhz: ;849 bytes to 8410 + jsr $8454
 !byte $85,$C5,$29,$7F,$9D,$3B,$84,$BD,$22,$84,$85,$C4,$A0,$27,$A9,$20
 !byte $91,$C4,$88,$10,$FB,$58,$4C,$AA,$84,$A0,$01,$8C,$80,$E8,$A9,$14
 !byte $8D,$81,$E8,$C8,$8C,$80,$E8,$AD,$3E,$E7,$38,$E9,$0A,$8D,$81,$E8,$60
-
 
 

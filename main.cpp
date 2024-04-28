@@ -33,13 +33,18 @@ extern "C" void hid_app_task(void);
 
 #include <stdio.h>
 #include <ctype.h>
-#include "flash.h"
+//#include "flash.h"
+#include "fatfs_disk.h"
 #include "ff.h"
 
 #ifdef PETIO_A000
+#include "menuloader-9000.h"
 #include "fb.h"
 #include "vsync.h"
+#include "romsa000.h"
+/*
 #include "wedge.h"
+#include "picchip.h"
 #include "jinsam8-rom-a000_database.h"
 #include "kram2.0-rom-a000.h"
 #include "micromon80-ud11-a000.h"
@@ -49,20 +54,20 @@ extern "C" void hid_app_task(void);
 #include "power_basic_8032_a000.h"
 #include "toolkit4.0_rom-a000.h"
 #include "wordpro3-rom-a000.h"
-#include "menuloader-9000.h"
+*/
 
 static const unsigned char * a000_rom_list[] = {
 //  vsync,
   fb,
-  jinsam8,
-  kram20,
-  micromon80,
-  orga_basic101,
-  pal_assembler,
-  pascal30,
-  power_basic_8032,
-  toolkit40,
-  wordpro3
+  picchipgfx, //sys40960 (pichip copyright 1981 houghton) but sys44103 MM and sys44559 wedge not ok
+  basicexpand, // sys40960 nocrash
+  pascal3,
+  wordpro3,
+  wordpro4,
+  wordpro,
+  toolkit4, // sys40960 nocrash (paics 1980)
+  arrow,
+  micromon3 // crash?
 };  
 #endif         
 
@@ -183,8 +188,6 @@ static FRESULT fres;
 #define MAX_FILENAME_SIZE   32
 static int nbFiles=0;
 static int file_block_wr_pt=0;
-int file_block_rd_pt=0;
-char file_block[512];
 static char files[MAX_FILES][MAX_FILENAME_SIZE];
 
 // ****************************************
@@ -738,21 +741,19 @@ static void handleCmdQueue(void) {
         file_block_wr_pt = 1;
         nbread = 0; 
         if( !(f_open(&file, &files[cmd.p8_1][0], FA_READ)) ) {
-          f_read (&file, (void*)&file_block[file_block_wr_pt], 255, &nbread);
+          f_read (&file, (void*)&mem[REG_TLOOKUP+file_block_wr_pt], 255, &nbread);
           if (!nbread) f_close(&file);
         }
         file_block_wr_pt += nbread; 
-        file_block[0] = nbread;
-        file_block_rd_pt = 0;
+        mem[REG_TLOOKUP] = nbread;
         break;        
       case cmd_readfile:
         file_block_wr_pt = 1;
         nbread = 0; 
-        f_read (&file, (void*)&file_block[file_block_wr_pt], 255, &nbread);
+        f_read (&file, (void*)&mem[REG_TLOOKUP+file_block_wr_pt], 255, &nbread);
         if (!nbread) f_close(&file);
         file_block_wr_pt += nbread; 
-        file_block[0] = nbread;
-        file_block_rd_pt = 0;
+        mem[REG_TLOOKUP] = nbread;
         break;        
       case cmd_opendir:
         nbFiles = 0;
@@ -767,14 +768,13 @@ static void handleCmdQueue(void) {
             if (entry.fname[0] != '.' ) {
               char * filename = entry.fname;
               strncpy(&files[nbFiles][0], filename, MAX_FILENAME_SIZE-1);
-              file_block_wr_pt += mystrncpy(&file_block[file_block_wr_pt], filename, MAX_FILENAME_SIZE-1);
+              file_block_wr_pt += mystrncpy((char*)&mem[REG_TLOOKUP+file_block_wr_pt], filename, MAX_FILENAME_SIZE-1);
               nbFiles++; 
             }  
           }
           fres = f_findnext(&dir, &entry);  
-        }
-        file_block[0] = nbFiles;
-        file_block_rd_pt = 0;
+        }      
+        mem[REG_TLOOKUP] = nbFiles;
         break;
       case cmd_readdir:
         nbFiles = 0;
@@ -788,14 +788,13 @@ static void handleCmdQueue(void) {
             if (entry.fname[0] != '.' ) {
               char * filename = entry.fname;
               strncpy(&files[nbFiles][0], filename, MAX_FILENAME_SIZE-1);
-              file_block_wr_pt += mystrncpy(&file_block[file_block_wr_pt], filename, MAX_FILENAME_SIZE-1);
+              file_block_wr_pt += mystrncpy((char*)&mem[REG_TLOOKUP+file_block_wr_pt], filename, MAX_FILENAME_SIZE-1);
               nbFiles++; 
             }  
           }
           fres = f_findnext(&dir, &entry);  
         }
-        file_block[0] = nbFiles;
-        file_block_rd_pt = 0;
+        mem[REG_TLOOKUP] = nbFiles;
         break;
       case cmd_a000_bank:
 #ifdef PETIO_A000
@@ -1197,9 +1196,6 @@ uint8_t readWord( uint16_t location)
     }  
   }
   else if (location < 0xa000) {
-    if (location == 0x9b13 ) {
-      return file_block[file_block_rd_pt++];
-    }  
     return mem[location-0x8000];
   }  
   else if (location < 0xb000) {
@@ -1368,6 +1364,7 @@ static void pet_kup(uint8_t asciicode) {
 // ****************************************
 
 //static const unsigned char digits[16] = {0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x41,0x42,0x43,0x44,0x45,0x46} ;
+static int prev_code=0;
 
 void kbd_signal_raw_key (int keycode, int code, int codeshifted, int flags, int pressed) {
   //mem[0] = digits[(keycode>>12)&0xf];
@@ -1408,11 +1405,15 @@ void kbd_signal_raw_key (int keycode, int code, int codeshifted, int flags, int 
   }
   else {
     code = toupper(code);
-  }     
+  }  
+
+  if (prev_code) pet_kup(prev_code);
+
   if (code) {
     if (pressed == KEY_PRESSED)
     {
       pet_kdown(code, flags & KBD_FLAG_RSHIFT, flags & KBD_FLAG_RCONTROL);
+      prev_code = code;
       //printf("kdown %c\r\n", kbd_to_ascii (code, flags));
     }
     else 
@@ -1605,31 +1606,24 @@ int main()
 #endif
 #endif
 
-
+  mount_fatfs_disk();
   fres = f_mount(&filesystem, "/", 1);
+  /*
   if (fres != FR_OK) {
-      printf("f_mount fail rc=%d\n", fres);
       while (1) {};
   }
-/*
-  FIL fp;
-  res = f_open(&fp, "back2pet.prg", FA_READ);
-  if (res == FR_OK) {
-    
-      uint8_t buffer[512];
-      UINT length;
-      //memset(buffer, 0, sizeof(buffer));
-      f_read(&fp, buffer, sizeof(buffer), &length);
-      printf("%s", buffer);
-      f_close(&fp);
-      
-  } else {
-      printf("can't open README.txt: %d\n", res);
-      while (1) {};
+  else {
+
+    FIL fp;
+    fres = f_open(&fp, "adventure.prg", FA_READ);
+    if (fres == FR_OK) {
+        f_close(&fp);
+    } else {
+        while (1) {};
+    }
+    //f_unmount("/");
   }
-   
-  f_unmount("/");
-*/
+  */
   memset((void*)&Bitmap[0],0, sizeof(Bitmap));
 
 #ifndef HAS_PETIO

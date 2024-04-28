@@ -50,8 +50,6 @@ extern uint8_t __not_in_flash("cmd_params_len") cmd_params_len[];
 extern void __not_in_flash("traParamFuncPtr") (*traParamFuncPtr[])(void);
 extern void __not_in_flash("traDataFuncPtr") (*traDataFuncPtr[])(uint8_t);
 extern void pushCmdQueue(QueueItem cmd );
-extern int file_block_rd_pt;
-extern char file_block[];
 
 static uint8_t cmd_param_ind;
 static uint8_t cmd_tra_depth;
@@ -68,11 +66,7 @@ static void __not_in_flash("read8000") read8000(uint32_t address) {
 }
 
 static void __not_in_flash("read9000") read9000(uint32_t address) {
-  if (address == 0x9b13 ) {
-    pio1->txf[smread] = 0x100 | file_block[file_block_rd_pt++];
-  } 
-  else  
-    pio1->txf[smread] = 0x100 | mem[address-0x8000];
+  pio1->txf[smread] = 0x100 | mem[address-0x8000];
 }
 
 static void __not_in_flash("readA000") readA000(uint32_t address) {

@@ -15,6 +15,7 @@
 #define DEV_MMC		1	/* Example: Map MMC/SD card to physical drive 1 */
 #define DEV_USB		2	/* Example: Map USB MSD to physical drive 2 */
 
+#include "fatfs_disk.h"
 
 /*-----------------------------------------------------------------------*/
 /* Get Drive Status                                                      */
@@ -27,28 +28,9 @@ DSTATUS disk_status (
 	DSTATUS stat;
 	int result;
 
-	switch (pdrv) {
-	case DEV_RAM :
-		result = RAM_disk_status();
+	if (pdrv == 0)
+		return 0;
 
-		// translate the reslut code here
-
-		return stat;
-
-	case DEV_MMC :
-		result = MMC_disk_status();
-
-		// translate the reslut code here
-
-		return stat;
-
-	case DEV_USB :
-		result = USB_disk_status();
-
-		// translate the reslut code here
-
-		return stat;
-	}
 	return STA_NOINIT;
 }
 
@@ -65,27 +47,9 @@ DSTATUS disk_initialize (
 	DSTATUS stat;
 	int result;
 
-	switch (pdrv) {
-	case DEV_RAM :
-		result = RAM_disk_initialize();
-
-		// translate the reslut code here
-
-		return stat;
-
-	case DEV_MMC :
-		result = MMC_disk_initialize();
-
-		// translate the reslut code here
-
-		return stat;
-
-	case DEV_USB :
-		result = USB_disk_initialize();
-
-		// translate the reslut code here
-
-		return stat;
+	if (pdrv == 0)
+	{
+		return 0;
 	}
 	return STA_NOINIT;
 }
@@ -106,32 +70,9 @@ DRESULT disk_read (
 	DRESULT res;
 	int result;
 
-	switch (pdrv) {
-	case DEV_RAM :
-		// translate the arguments here
-
-		result = RAM_disk_read(buff, sector, count);
-
-		// translate the reslut code here
-
-		return res;
-
-	case DEV_MMC :
-		// translate the arguments here
-
-		result = MMC_disk_read(buff, sector, count);
-
-		// translate the reslut code here
-
-		return res;
-
-	case DEV_USB :
-		// translate the arguments here
-
-		result = USB_disk_read(buff, sector, count);
-
-		// translate the reslut code here
-
+	if (pdrv == 0)
+	{
+		res = fatfs_disk_read((uint8_t*)buff, sector, count);
 		return res;
 	}
 
@@ -156,32 +97,9 @@ DRESULT disk_write (
 	DRESULT res;
 	int result;
 
-	switch (pdrv) {
-	case DEV_RAM :
-		// translate the arguments here
-
-		result = RAM_disk_write(buff, sector, count);
-
-		// translate the reslut code here
-
-		return res;
-
-	case DEV_MMC :
-		// translate the arguments here
-
-		result = MMC_disk_write(buff, sector, count);
-
-		// translate the reslut code here
-
-		return res;
-
-	case DEV_USB :
-		// translate the arguments here
-
-		result = USB_disk_write(buff, sector, count);
-
-		// translate the reslut code here
-
+	if (pdrv == 0)
+	{
+		res = fatfs_disk_write((const uint8_t*)buff, sector, count);
 		return res;
 	}
 
@@ -204,24 +122,26 @@ DRESULT disk_ioctl (
 	DRESULT res;
 	int result;
 
-	switch (pdrv) {
-	case DEV_RAM :
-
-		// Process of the command for the RAM drive
-
-		return res;
-
-	case DEV_MMC :
-
-		// Process of the command for the MMC/SD card
-
-		return res;
-
-	case DEV_USB :
-
-		// Process of the command the USB drive
-
-		return res;
+	if (pdrv == 0)
+	{
+		switch(cmd) {
+			case CTRL_SYNC:
+				fatfs_disk_sync();
+				return RES_OK;
+			case GET_SECTOR_COUNT:
+				*(LBA_t*) buff = SECTOR_NUM;
+				return RES_OK;
+			case GET_SECTOR_SIZE:
+				*(WORD*) buff = SECTOR_SIZE;
+				return RES_OK;
+			case GET_BLOCK_SIZE:
+				*(DWORD*) buff = 1;
+				return RES_OK;
+			case CTRL_TRIM:
+				return RES_OK;
+			default:
+				return RES_PARERR;
+		}
 	}
 
 	return RES_PARERR;
