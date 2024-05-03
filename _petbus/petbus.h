@@ -240,10 +240,7 @@ extern bool font_lowercase;
 typedef struct {
    uint8_t  id;
    uint8_t  p8_1;
-   uint8_t  p8_2;
-   uint8_t  p8_3;
    uint16_t p16_1;
-   uint16_t p16_2;
 } QueueItem;
 
 #define MAX_CMD 32

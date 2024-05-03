@@ -1,4 +1,4 @@
-!to "fb.prg"
+!to "fb.bin"
 
 ; mode
 REG_VIDEO_MODE    = $9b00
@@ -18,30 +18,21 @@ REG_TSTATUS       = $9b14
 ROWLEN     = 80
 ROWLEN_LO  = 40
 ROWLEN_HI  = 80
-FILENAME_SIZE  = 20
 
-*= $0800
-        jmp topdir              ; goto root dir and clear
-
-loop:    
-        ldx #63                 ; copy directory name for opendir 
-copydir:
-        lda directory,x
-        sta REG_TLOOKUP,x
-        dex
-        bpl copydir
+*= $a000
+        jsr clear_screen        ; clear screen
+        jsr clear_files 
+    
+loop:
         lda #29                 ; cmd_opendir
         sta REG_TCOMMAND
-        lda #1
-        sta REG_TSTATUS
 waitstatusdone:
         lda REG_TSTATUS
         bne waitstatusdone
 
         lda REG_TLOOKUP
-        sta nbfiles             ; nb of files
-        cmp #0
         beq no_files
+        sta nbfiles             ; nb of files
 
         lda #<filenames         ; dst lo
         sta loc+1
@@ -50,12 +41,7 @@ waitstatusdone:
         ldx #0
         lda #0
 nextfile:                       ; read DIR filenames char by char
-
-        pha                     ; file index
-        tay
-        inx
-        lda REG_TLOOKUP,x       ; filetype 0=DIR,1=PRG,2=ROM
-        sta filetypes,y
+        pha
         ldy #0
 nextchar:
         inx
@@ -67,7 +53,7 @@ loc:    sta $8090,y
 endfilename:
         clc
         lda loc+1
-        adc #FILENAME_SIZE
+        adc #32
         sta loc+1
         bcc hic             
         inc loc+2          
@@ -86,14 +72,9 @@ WAIT_KEY
         beq nextpage
         cmp #$0d
         beq exit
-        cmp #$11 ;9B                ; ESC 
-        beq rewinddir   
         cmp #$14                ; BACK reset
         bne WAIT1
         jmp ($fffc)
-no_files:
-        jsr print_file_menu
-        jmp WAIT_KEY
 WAIT1:        
         cmp #$20                ; SPC  LORES
         bne WAIT2
@@ -113,27 +94,14 @@ WAIT2:
         sbc #$30
         cmp nbfiles
         bpl WAIT_KEY
-        pha
-        tax
-        lda filetypes,x
-        tax
-        pla
-        cpx #0                  ; directory?
-        beq newdir
+        jsr load_file
+        jmp clear_screen
 
-        cpx #2                  ; rom?
-        beq isrom         
-        pha                     ; prg?
-        jsr clear_screen
-        pla
-        jmp load_prg            
-isrom:
-        pha
-        jsr clear_screen
-        pla
-        jmp load_rom
+no_files:
+        jsr clear_screen        ; clear screen
+        jmp loop
 
-exit:        
+exit        
         jsr clear_screen        ; clear screen
         rts 
 
@@ -143,57 +111,6 @@ nextpage:
         sta REG_TCOMMAND
         jmp waitstatusdone
 
-newdir:
-        asl                     ;*4
-        asl
-        sta by4+1
-        asl
-        asl
-by4:    adc #0                  ;+*16 = *20
-        clc 
-        jsr append_filename_to_dir
-        jsr clear_files        
-        jsr clear_screen
-        jmp loop
-
-rewinddir:
-;        lda dirpt
-;        bne rew1 
-;        jmp WAIT_KEY
-;rew1:   tax
-;rew2:
-;        dex
-;        lda directory,x
-;        cmp #'/'
-;        bne rew2
-;        lda #0
-;        sta directory,x
-
-topdir:
-        lda #0                  ; directory = "" 
-        sta directory
-        sta dirpt
-
-        jsr clear_files        
-        jsr clear_screen
-        jmp loop
-
-;-------------------------------------------------------------
-append_filename_to_dir:
-        tax
-        ldy dirpt
-        lda #'/'
-        sta directory,y
-        iny
-cpydir: lda line0,x
-        sta directory,y
-        inx
-        iny
-        cmp #0
-        bne cpydir
-        dey
-        sty dirpt
-        rts
 
 ;-------------------------------------------------------------
 clear_screen:
@@ -251,19 +168,19 @@ copy2:
 
 ;-------------------------------------------------------------
 clear_files:
-        ldx #FILENAME_SIZE-1    ; clear file buffer 
+        ldx #31                 ; clear file buffer 
 clear_f:
         lda #0
         sta filenames,x
-        sta filenames+1*FILENAME_SIZE,x
-        sta filenames+2*FILENAME_SIZE,x
-        sta filenames+3*FILENAME_SIZE,x
-        sta filenames+4*FILENAME_SIZE,x
-        sta filenames+5*FILENAME_SIZE,x
-        sta filenames+6*FILENAME_SIZE,x
-        sta filenames+7*FILENAME_SIZE,x
-        sta filenames+8*FILENAME_SIZE,x
-        sta filenames+9*FILENAME_SIZE,x
+        sta filenames+1*32,x
+        sta filenames+2*32,x
+        sta filenames+3*32,x
+        sta filenames+4*32,x
+        sta filenames+5*32,x
+        sta filenames+6*32,x
+        sta filenames+7*32,x
+        sta filenames+8*32,x
+        sta filenames+9*32,x
         dex
         bpl clear_f
         rts
@@ -332,8 +249,6 @@ pr_end
 print_numbers:                  
         ldx #0                  ; y = start row
 pri_num0
-        cpx nbfiles
-        beq pri_exit
         lda linelo,y            ; dst lo
         sta addrr+1
         lda linehi,y            ; dst hi
@@ -342,8 +257,8 @@ pri_num0
 addrr   sta $8000               ; store digit
         iny                  
         inx
-        jmp pri_num0
-pri_exit:                
+        cpx nbfiles
+        bne pri_num0        
         rts
 
 ;-------------------------------------------------------------
@@ -360,12 +275,7 @@ print_file_menu:
         lda #<footer2           ; footer2
         ldx #>footer2
         ldy #14
-        jsr print
-        lda #<directory         ; footer3
-        ldx #>directory
-        ldy #15
-        jsr print 
-
+        jsr print        
         ldy #2                  ; print numbers of each row
         jsr print_numbers
         lda #<line0             ; print 10 filenames list
@@ -412,37 +322,35 @@ print_file_menu:
 
 
 ;-------------------------------------------------------------
-nbbytes  = $8000
-load_prg:
+load_file:
         sei
         pha
         ldx #0
-copycodeprg:
-        lda codeloadprg,x
+copycode:
+        lda code,x
         sta $8000,x
         inx
-        cpx #$a0
-        bne copycodeprg
-        jmp $8001
+        bne copycode
+        jmp $8000
 
-codeloadprg:
-        !byte 0
+code:
         lda #27                 ; cmd_openfile
         sta REG_TCOMMAND
         pla
         sta REG_TPARAMS         ; file index
+
 waitstatusdone1:
         lda REG_TSTATUS
         bne waitstatusdone1
         lda REG_TLOOKUP         ; nb bytes
-        beq exitloadprg
+        beq exitload
         sta nbbytes             
         lda REG_TLOOKUP+1       ; start address lo
         sta $54
         lda REG_TLOOKUP+2       ; start address hi
         sta $55
         dec nbbytes
-        dec nbbytes      
+        dec nbbytes
         ldy #00                 ; index
         ldx #00
 load1:        
@@ -458,7 +366,8 @@ load2:
         inx
         cpx nbbytes
         bne load1
-nextblockprg:
+        
+nextblock:
         lda #28                 ; cmd_readfile
         sta REG_TCOMMAND
 waitstatusdone2:
@@ -466,7 +375,7 @@ waitstatusdone2:
         bne waitstatusdone2
         lda REG_TLOOKUP         ; nb bytes
         sta nbbytes 
-        beq exitloadprg
+        beq exitload
         ldy #00                 ; index
         ldx #00
 load3:        
@@ -482,13 +391,15 @@ load4:
         inx
         cpx nbbytes
         bne load3
-        beq nextblockprg
+        beq nextblock
 
-exitloadprg:
+exitload:
+
         lda $28
         sta $c7
         lda $29
         sta $c8
+
         lda $54
         sta $2a
         sta $2c
@@ -499,80 +410,7 @@ exitloadprg:
         sta $2d
         sta $2f
         sta $ca
-        cli
-        rts
 
-load_rom:
-        sei
-        pha
-        ldx #0
-copycoderom:
-        lda codeloadrom,x
-        sta $8000,x
-        inx
-        cpx #$a0
-        bne copycoderom
-        jmp $8001
-
-codeloadrom:
-        !byte 0
-        lda #27                 ; cmd_openfile
-        sta REG_TCOMMAND
-        pla
-        sta REG_TPARAMS         ; file index
-waitstatusdone3:
-        lda REG_TSTATUS
-        bne waitstatusdone3
-        lda REG_TLOOKUP         ; nb bytes
-        beq exitloadrom
-        sta nbbytes             
-        lda #$00                ; start address lo
-        sta $54
-        lda #$a0                ; start address hi
-        sta $55
-        ldy #00                 ; index
-        ldx #00
-load5:        
-        lda REG_TLOOKUP+1,x     ; read data byte        
-        sta ($54),y             ; store it 
-        clc
-        lda $54
-        adc #1
-        sta $54
-        bcc load6             
-        inc $55          
-load6:   
-        inx
-        cpx nbbytes
-        bne load5
-        
-nextblockrom:
-        lda #28                 ; cmd_readfile
-        sta REG_TCOMMAND
-waitstatusdone4:
-        lda REG_TSTATUS
-        bne waitstatusdone4
-        lda REG_TLOOKUP         ; nb bytes
-        sta nbbytes 
-        beq exitloadrom
-        ldy #00                 ; index
-        ldx #00
-load7:        
-        lda REG_TLOOKUP+1,x     ; read data byte        
-        sta ($54),y             ; store it 
-        clc
-        lda $54
-        adc #1
-        sta $54
-        bcc load8             
-        inc $55          
-load8:    
-        inx
-        cpx nbbytes
-        bne load7
-        beq nextblockrom
-
-exitloadrom:
         cli
         rts
 
@@ -584,16 +422,11 @@ linehi:
 
 nbfiles:
 !byte 0
+nbbytes:
+!byte 0
 
 numbers
 !text "1234567890"
-dirpt:
-!byte 0
-directory:
-!text "0123456789abcdef0123456789abcdef"
-!text "0123456789abcdef0123456789abcdef"
-!text "0123456789abcdef0123456789abcdef"
-!text "0123456789abcdef0123456789abcdef"
 
 header
 !text "FILE BROWSER 1.0, SELECT FILE:   "
@@ -602,32 +435,30 @@ footer1
 !text "RIGHT=PAGE RET=EXIT SPC=LORES DEL=RESET"
 !byte 0
 footer2
-!text "DOWN=TOP DIR   (0-9) LOAD FILE/OPEN DIR"
+!text "(0-9) LOAD FILE"
 !byte 0
 
-filetypes:
-!byte 0,0,0,0,0,0,0,0,0,0
 filenames:
 line0:
-!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 line1:
-!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 line2:
-!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 line3:
-!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 line4:
-!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 line5:
-!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 line6:
-!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 line7:
-!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 line8:
-!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 line9:
-!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+!byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 
 anyhz: ;849 bytes to 8410 + jsr $8454
 !byte $31,$14,$1F,$0F,$31,$00,$19,$25,$00,$07,$00,$00,$10,$00,$00,$00
@@ -683,4 +514,5 @@ anyhz: ;849 bytes to 8410 + jsr $8454
 !byte $85,$C5,$29,$7F,$9D,$3B,$84,$BD,$22,$84,$85,$C4,$A0,$27,$A9,$20
 !byte $91,$C4,$88,$10,$FB,$58,$4C,$AA,$84,$A0,$01,$8C,$80,$E8,$A9,$14
 !byte $8D,$81,$E8,$C8,$8C,$80,$E8,$AD,$3E,$E7,$38,$E9,$0A,$8D,$81,$E8,$60
+
 

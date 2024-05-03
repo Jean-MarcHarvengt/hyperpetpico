@@ -38,37 +38,8 @@ extern "C" void hid_app_task(void);
 #include "ff.h"
 
 #ifdef PETIO_A000
-#include "menuloader-9000.h"
 #include "fb.h"
 #include "vsync.h"
-#include "romsa000.h"
-/*
-#include "wedge.h"
-#include "picchip.h"
-#include "jinsam8-rom-a000_database.h"
-#include "kram2.0-rom-a000.h"
-#include "micromon80-ud11-a000.h"
-#include "orga_basic101-a000.h"
-#include "pal_assembler_a000.h"
-#include "pascal3.0_rom-a000.h"
-#include "power_basic_8032_a000.h"
-#include "toolkit4.0_rom-a000.h"
-#include "wordpro3-rom-a000.h"
-*/
-
-static const unsigned char * a000_rom_list[] = {
-//  vsync,
-  fb,
-  picchipgfx, //sys40960 (pichip copyright 1981 houghton) but sys44103 MM and sys44559 wedge not ok
-  basicexpand, // sys40960 nocrash
-  pascal3,
-  wordpro3,
-  wordpro4,
-  wordpro,
-  toolkit4, // sys40960 nocrash (paics 1980)
-  arrow,
-  micromon3 // crash?
-};  
 #endif         
 
 // Graphics
@@ -185,10 +156,15 @@ static DIR dir;
 static FILINFO entry;
 static FRESULT fres;
 #define MAX_FILES           10
-#define MAX_FILENAME_SIZE   32
+#define MAX_FILENAME_SIZE   20
+#define FILE_IS_DIR         0
+#define FILE_IS_PRG         1
+#define FILE_IS_ROM         2
+
 static int nbFiles=0;
 static int file_block_wr_pt=0;
 static char files[MAX_FILES][MAX_FILENAME_SIZE];
+static char curdirectory[256]={0};
 
 // ****************************************
 // Audio code
@@ -596,10 +572,6 @@ static void VideoRenderInit(void)
 {
   // initialize shared memory
   memset((void*)&mem[0x0000], 0, 0x2000); // text/tilemap...
-#ifdef PETIO_A000
-  // sys 36864 / sys 40960
-  memcpy((void *)&mem[0x1000], (void *)&menuloader[0], sizeof(menuloader));
-#endif 
   // initialize GFX memory
   ResetGFXMem();  
 
@@ -739,8 +711,10 @@ static void handleCmdQueue(void) {
         break;
       case cmd_openfile:
         file_block_wr_pt = 1;
-        nbread = 0; 
-        if( !(f_open(&file, &files[cmd.p8_1][0], FA_READ)) ) {
+        nbread = 0;
+        strcat(curdirectory, "/");
+        strcat(curdirectory, &files[cmd.p8_1][0]);
+        if( !(f_open(&file, curdirectory , FA_READ)) ) {
           f_read (&file, (void*)&mem[REG_TLOOKUP+file_block_wr_pt], 255, &nbread);
           if (!nbread) f_close(&file);
         }
@@ -758,22 +732,52 @@ static void handleCmdQueue(void) {
       case cmd_opendir:
         nbFiles = 0;
         file_block_wr_pt = 1;
-        fres = f_findfirst(&dir, &entry, "", "*");
+        if (mem[REG_TLOOKUP] > 0x7f) {
+          mem[REG_TLOOKUP] = 0;
+        }  
+        memcpy((void *)curdirectory, (void *)&mem[REG_TLOOKUP], 256);
+        f_closedir(&dir);
+        fres = f_findfirst(&dir, &entry, curdirectory, "*");
         while ( (fres == FR_OK) && (entry.fname[0]) && (nbFiles<MAX_FILES) ) {  
           if (!entry.fname[0]) {
             f_closedir(&dir);
             break;
           }
-          if ( !(entry.fattrib & AM_DIR) ) {
-            if (entry.fname[0] != '.' ) {
-              char * filename = entry.fname;
-              strncpy(&files[nbFiles][0], filename, MAX_FILENAME_SIZE-1);
+          bool valid = true;
+          char * filename = entry.fname;
+          int size = mystrncpy(&files[nbFiles][0], filename, MAX_FILENAME_SIZE-1); // including eol (0)
+          if (entry.fname[0] != '.' ) { // skip any MACOS file but also ".", ".."
+            // not a directory
+            if ( !(entry.fattrib & AM_DIR) ) {
+              if ( (size > 4) && 
+                   (filename[size-5] == '.' ) && 
+                   (filename[size-4] == 'p' ) && 
+                   (filename[size-3] == 'r' ) && 
+                   (filename[size-2] == 'g' ) ) {
+                mem[REG_TLOOKUP+file_block_wr_pt++] = FILE_IS_PRG;
+              }
+              else   
+              if ( (size > 4) && 
+                   (filename[size-5] == '.' ) && 
+                   (filename[size-4] == 'b' ) && 
+                   (filename[size-3] == 'i' ) && 
+                   (filename[size-2] == 'n' ) ) {
+                mem[REG_TLOOKUP+file_block_wr_pt++] = FILE_IS_ROM;
+              }
+              else {
+                valid = false;
+              }
+            }
+            else {
+              mem[REG_TLOOKUP+file_block_wr_pt++] = FILE_IS_DIR;
+            }
+            if (valid == true) {
               file_block_wr_pt += mystrncpy((char*)&mem[REG_TLOOKUP+file_block_wr_pt], filename, MAX_FILENAME_SIZE-1);
-              nbFiles++; 
+              nbFiles++;
             }  
-          }
-          fres = f_findnext(&dir, &entry);  
-        }      
+          }               
+          fres = f_findnext(&dir, &entry);
+        }   
         mem[REG_TLOOKUP] = nbFiles;
         break;
       case cmd_readdir:
@@ -784,22 +788,44 @@ static void handleCmdQueue(void) {
             f_closedir(&dir);
             break;
           }
-          if ( !(entry.fattrib & AM_DIR) ) {
-            if (entry.fname[0] != '.' ) {
-              char * filename = entry.fname;
-              strncpy(&files[nbFiles][0], filename, MAX_FILENAME_SIZE-1);
+          bool valid = true;
+          char * filename = entry.fname;
+          int size = mystrncpy(&files[nbFiles][0], filename, MAX_FILENAME_SIZE-1); // including eol (0)
+          if (entry.fname[0] != '.' ) { // skip any MACOS file but also ".", ".."
+            // not a directory
+            if ( !(entry.fattrib & AM_DIR) ) {
+              if ( (size > 4) && 
+                   (filename[size-5] == '.' ) && 
+                   (filename[size-4] == 'p' ) && 
+                   (filename[size-3] == 'r' ) && 
+                   (filename[size-2] == 'g' ) ) {
+                mem[REG_TLOOKUP+file_block_wr_pt++] = FILE_IS_PRG;
+              }
+              else   
+              if ( (size > 4) && 
+                   (filename[size-5] == '.' ) && 
+                   (filename[size-4] == 'b' ) && 
+                   (filename[size-3] == 'i' ) && 
+                   (filename[size-2] == 'n' ) ) {
+                mem[REG_TLOOKUP+file_block_wr_pt++] = FILE_IS_ROM;
+              }
+              else {
+                valid = false;
+              }
+            }
+            else {
+              mem[REG_TLOOKUP+file_block_wr_pt++] = FILE_IS_DIR;
+            }
+            if (valid == true) {
               file_block_wr_pt += mystrncpy((char*)&mem[REG_TLOOKUP+file_block_wr_pt], filename, MAX_FILENAME_SIZE-1);
-              nbFiles++; 
+              nbFiles++;
             }  
-          }
-          fres = f_findnext(&dir, &entry);  
+          }               
+          fres = f_findnext(&dir, &entry); 
         }
         mem[REG_TLOOKUP] = nbFiles;
         break;
       case cmd_a000_bank:
-#ifdef PETIO_A000
-        memcpy((void *)&mem_a000[0], (void *)a000_rom_list[cmd.p8_1], 0x1000);
-#endif
         break;        
       default:
         break;
@@ -1641,7 +1667,7 @@ int main()
   //AudioRenderInit();
 
 #ifdef PETIO_A000
-  memcpy((void *)&mem_a000[0], (void *)a000_rom_list[0], 0x1000);
+  memcpy((void *)&mem_a000[0], (void *)fb, sizeof(fb));
 #endif 
 
 #ifdef HAS_PETIO

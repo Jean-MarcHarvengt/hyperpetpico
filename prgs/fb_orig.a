@@ -1,5 +1,14 @@
 !to "fb.prg"
 
+*= $0401
+        * = $0401
+        !word bas_end
+        !word $00
+        !byte $9e
+        !text "2048"
+        !byte $00
+bas_end !word $00
+
 ; mode
 REG_VIDEO_MODE    = $9b00
 ; 0-1: resolution (0=64$200,1=32$200,2=256x200)
@@ -15,12 +24,15 @@ REG_TPARAMS       = $9b12
 REG_TDATA         = $9b13
 REG_TSTATUS       = $9b14
 
-ROWLEN     = 80
-ROWLEN_LO  = 40
-ROWLEN_HI  = 80
+ROWLEN         = 80
+ROWLEN_LO      = 40
+ROWLEN_HI      = 80
 FILENAME_SIZE  = 20
 
 *= $0800
+;        jmp $7000
+;*= $7000
+
         jmp topdir              ; goto root dir and clear
 
 loop:    
@@ -683,4 +695,9 @@ anyhz: ;849 bytes to 8410 + jsr $8454
 !byte $85,$C5,$29,$7F,$9D,$3B,$84,$BD,$22,$84,$85,$C4,$A0,$27,$A9,$20
 !byte $91,$C4,$88,$10,$FB,$58,$4C,$AA,$84,$A0,$01,$8C,$80,$E8,$A9,$14
 !byte $8D,$81,$E8,$C8,$8C,$80,$E8,$AD,$3E,$E7,$38,$E9,$0A,$8D,$81,$E8,$60
+
+
+
+
+
 
