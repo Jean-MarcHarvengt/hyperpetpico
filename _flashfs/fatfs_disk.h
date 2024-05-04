@@ -3,9 +3,12 @@
 
 #include <stdbool.h>
 
-#define HW_FLASH_STORAGE_BASE  (0x14c000)
+//#define HW_FLASH_STORAGE_BASE  (0x14c000) // 720 KB  floppy
+#define HW_FLASH_STORAGE_BASE  (0x100000) // 1MB  floppy
+//#define HW_FLASH_STORAGE_BASE  (0x098000) // 1.44 MB floppy
+//#define SECTOR_NUM 1440  // 720 KB floppy = 0xb4000
+#define SECTOR_NUM 2048  // 1MB floppy = 0x100000
 //#define SECTOR_NUM 2880  // 1.44 MB floppy = 0x168000
-#define SECTOR_NUM 1440  // 720 KB floppy = 0xb4000
 #define SECTOR_SIZE 512
 
 #ifdef __cplusplus

@@ -15,6 +15,7 @@
 #define KBD_KEY_LEFT       1005
 #define KBD_KEY_HOME       1006
 #define KBD_KEY_END        1007
+#define KBD_KEY_ESC        1008
 
 #define KEY_PRESSED  1
 #define KEY_RELEASED 0

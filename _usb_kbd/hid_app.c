@@ -177,7 +177,7 @@ static int conv_table_us[128][2] =
     {'9'   , '('    }, /* 0x26 */ \
     {'0'   , ')'    }, /* 0x27 */ \
     {KBD_KEY_ENTER  , KBD_KEY_ENTER   }, /* 0x28 */ \
-    {'\x1b', '\x1b' }, /* 0x29 */ \
+    {KBD_KEY_ESC,  KBD_KEY_ESC }, /* 0x29 */ \
     {KBD_KEY_BS  , KBD_KEY_BS }, /* 0x2a */ \
     {'\t'  , '\t'   }, /* 0x2b */ \
     {' '   , ' '    }, /* 0x2c */ \
@@ -286,7 +286,7 @@ static int conv_table_be[128][2] =
     {'9'   , '{'    }, /* 0x26 */ \
     {'0'   , '}'    }, /* 0x27 */ \
     {KBD_KEY_ENTER  , KBD_KEY_ENTER   }, /* 0x28 */ \
-    {0     , 0      }, /*{'\x1b', '\x1b' },*/ /* 0x29 ESC*/ \
+    {KBD_KEY_ESC,  KBD_KEY_ESC }, /* 0x29 ESC*/ \
     {KBD_KEY_BS  , KBD_KEY_BS }, /* 0x2a */ \
     {'\t'  , '\t'   }, /* 0x2b */ \
     {' '   , ' '    }, /* 0x2c */ \

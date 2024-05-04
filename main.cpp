@@ -1364,21 +1364,17 @@ static void _reset(uint8_t k) {
 }
 
 static void pet_kdown(uint8_t asciicode, bool shiftl, bool shiftr ) {
-  if (asciicode < 0x80) {
-    _set(ascii2rowcol(asciicode));
-    if ( (shiftl) && (shiftr) ) _rows[0]|= 0x40;
-    else if (shiftl) _rows[6]|= 0x01;
-    else if (shiftr) _rows[6]|= 0x40;
-  }
+  _set(ascii2rowcol(asciicode));
+  if ( (shiftl) && (shiftr) ) _rows[0]|= 0x40;
+  else if (shiftl) _rows[6]|= 0x01;
+  else if (shiftr) _rows[6]|= 0x40;
 }
 
 static void pet_kup(uint8_t asciicode) {
-  if (asciicode < 0x80) {
-    _reset(ascii2rowcol(asciicode));
-    _rows[6] &= 0xfe;
-    _rows[6] &= 0xbf;
-    _rows[0] &= 0xbf;
-  }  
+  _reset(ascii2rowcol(asciicode));
+  _rows[6] &= 0xfe;
+  _rows[6] &= 0xbf;
+  _rows[0] &= 0xbf; 
 }
 #endif
 
@@ -1406,7 +1402,7 @@ void kbd_signal_raw_key (int keycode, int code, int codeshifted, int flags, int 
     else if (codeshifted == '*') {code = ':'; flags |= KBD_FLAG_RSHIFT; }
     else if (codeshifted == '%') {code = '5'; flags |= KBD_FLAG_RSHIFT; }
     else if (codeshifted == '?') {code = '/'; flags |= KBD_FLAG_RSHIFT; }
-    else if (codeshifted == '.') {code = '.'; 0; }
+    else if (codeshifted == '.') {code = '.'; flags |= 0; }
     else if (codeshifted == '+') {code = ';'; flags |= KBD_FLAG_RSHIFT; }
     else if (codeshifted == '>') {code = '.'; flags |= KBD_FLAG_RSHIFT; }
     else if (codeshifted == ')') {code = '9'; flags |= KBD_FLAG_RSHIFT; }
@@ -1417,6 +1413,7 @@ void kbd_signal_raw_key (int keycode, int code, int codeshifted, int flags, int 
     else if (codeshifted == KBD_KEY_RIGHT) {code = 0x1D; flags |= 0; }
     else if (codeshifted == KBD_KEY_UP) {code = 0x11; flags |= KBD_FLAG_RSHIFT; }
     else if (codeshifted == KBD_KEY_LEFT) {code = 0x1D; flags |= KBD_FLAG_RSHIFT; }
+    else if (codeshifted == KBD_KEY_ESC) {code = 0x9B; flags |= 0; }
     // no PET chars for below characters!!!
     else if (codeshifted == '@') {code = 0; flags |= 0; }
     else if (codeshifted == '[') {code = 0; flags |= 0; }
