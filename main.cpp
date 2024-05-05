@@ -56,30 +56,13 @@ extern "C" void hid_app_task(void);
 #define VMODE_HIRES    0
 #define VMODE_LORES    1
 #define VMODE_GAMERES  2
-#ifndef HAS_PETIO
-#ifdef EIGHTYCOL
-#define VMODE_DEFAULT  VMODE_HIRES
-#else
-#define VMODE_DEFAULT  VMODE_LORES
-#endif
-#else
-#define VMODE_DEFAULT  VMODE_HIRES
-#endif
 
 // screen resolution
 #define HI_XRES        640
 #define LO_XRES        320
 #define GAME_XRES      256 
 
-#ifndef HAS_PETIO
-#ifdef EIGHTYCOL
-#define MAXWIDTH       HI_XRES        // Max screen width
-#else
-#define MAXWIDTH       LO_XRES        // Max screen width
-#endif
-#else
-#define MAXWIDTH       HI_XRES        // Max screen width
-#endif
+#define MAXWIDTH       640            // Max screen width
 #define MAXHEIGHT      200            // Max screen height
 
 // Sprite definition
@@ -114,7 +97,8 @@ static sVmode Vmode2;
 static sVgaCfg Cfg2;
 
 // Screen resolution
-static u8 video_mode = VMODE_DEFAULT;
+static u8 video_default = VMODE_HIRES;
+static u8 video_mode;
 static u16 screen_height = 200;
 static u16 screen_width;
 
@@ -149,6 +133,7 @@ static ALIGNED u8 TileData[TILE_MAXDATA];
 static bool pet_reset = false;
 
 // filesystem
+static bool fatfs_mounted = false;
 static FATFS filesystem;
 static FATFS fatfs;
 static FIL file; 
@@ -164,7 +149,7 @@ static FRESULT fres;
 static int nbFiles=0;
 static int file_block_wr_pt=0;
 static char files[MAX_FILES][MAX_FILENAME_SIZE];
-static char curdirectory[256]={0};
+static char scratchpad[256]={0};
 
 // ****************************************
 // Audio code
@@ -257,7 +242,6 @@ static void VideoInit(u8 mode, bool firstTime)
   video_mode = mode;
   SET_XSCROLL_L0(0);
   SET_XSCROLL_L1(0);
-//  if (video_mode == VMODE_HIRES) memset(Bitmap, 0 , MAXWIDTH*MAXHEIGHT/2);  
 }
 
 
@@ -573,7 +557,11 @@ static void VideoRenderInit(void)
   // initialize shared memory
   memset((void*)&mem[0x0000], 0, 0x2000); // text/tilemap...
   // initialize GFX memory
-  ResetGFXMem();  
+  ResetGFXMem();
+  
+#ifdef PETIO_A000
+  memcpy((void *)&mem_a000[0], (void *)fb, sizeof(fb));
+#endif 
 
   // prepare sprites
   for (int i = 0; i < SPRITE_NUM_MAX; i++)
@@ -631,13 +619,12 @@ static void VideoRenderInit(void)
 //    mem[REG_LINES_L1_XSCR+i] = 0;
 //  }
 
-#ifndef HAS_PETIO
-#ifdef EIGHTYCOL
-  SET_VIDEO_MODE(0);
-#else
-  SET_VIDEO_MODE(1);
-#endif  
-#endif
+  if ( video_default == VMODE_HIRES ) {
+    SET_VIDEO_MODE(0);
+  }  
+  else {
+    SET_VIDEO_MODE(1);
+  }  
 }
 
 static void AudioRenderInit(void)
@@ -710,118 +697,126 @@ static void handleCmdQueue(void) {
         memset((void*)&Bitmap[0],0, sizeof(Bitmap));
         break;
       case cmd_openfile:
-        file_block_wr_pt = 1;
         nbread = 0;
-        strcat(curdirectory, "/");
-        strcat(curdirectory, &files[cmd.p8_1][0]);
-        if( !(f_open(&file, curdirectory , FA_READ)) ) {
-          f_read (&file, (void*)&mem[REG_TLOOKUP+file_block_wr_pt], 255, &nbread);
-          if (!nbread) f_close(&file);
+        if (fatfs_mounted) {
+          file_block_wr_pt = 1;
+          strcat(scratchpad, "/");
+          strcat(scratchpad, &files[cmd.p8_1][0]);
+          if( !(f_open(&file, scratchpad , FA_READ)) ) {
+            f_read (&file, (void*)&mem[REG_TLOOKUP+file_block_wr_pt], 255, &nbread);
+            if (!nbread) f_close(&file);
+          }
+          file_block_wr_pt += nbread; 
         }
-        file_block_wr_pt += nbread; 
         mem[REG_TLOOKUP] = nbread;
         break;        
       case cmd_readfile:
-        file_block_wr_pt = 1;
         nbread = 0; 
-        f_read (&file, (void*)&mem[REG_TLOOKUP+file_block_wr_pt], 255, &nbread);
-        if (!nbread) f_close(&file);
-        file_block_wr_pt += nbread; 
+        if (fatfs_mounted) {
+          file_block_wr_pt = 1;
+          f_read (&file, (void*)&mem[REG_TLOOKUP+file_block_wr_pt], 255, &nbread);
+          if (!nbread) f_close(&file);
+          file_block_wr_pt += nbread; 
+        }
         mem[REG_TLOOKUP] = nbread;
         break;        
       case cmd_opendir:
         nbFiles = 0;
-        file_block_wr_pt = 1;
-        if (mem[REG_TLOOKUP] > 0x7f) {
-          mem[REG_TLOOKUP] = 0;
-        }  
-        memcpy((void *)curdirectory, (void *)&mem[REG_TLOOKUP], 256);
-        f_closedir(&dir);
-        fres = f_findfirst(&dir, &entry, curdirectory, "*");
-        while ( (fres == FR_OK) && (entry.fname[0]) && (nbFiles<MAX_FILES) ) {  
-          if (!entry.fname[0]) {
-            f_closedir(&dir);
-            break;
-          }
-          bool valid = true;
-          char * filename = entry.fname;
-          int size = mystrncpy(&files[nbFiles][0], filename, MAX_FILENAME_SIZE-1); // including eol (0)
-          if (entry.fname[0] != '.' ) { // skip any MACOS file but also ".", ".."
-            // not a directory
-            if ( !(entry.fattrib & AM_DIR) ) {
-              if ( (size > 4) && 
-                   (filename[size-5] == '.' ) && 
-                   (filename[size-4] == 'p' ) && 
-                   (filename[size-3] == 'r' ) && 
-                   (filename[size-2] == 'g' ) ) {
-                mem[REG_TLOOKUP+file_block_wr_pt++] = FILE_IS_PRG;
-              }
-              else   
-              if ( (size > 4) && 
-                   (filename[size-5] == '.' ) && 
-                   (filename[size-4] == 'b' ) && 
-                   (filename[size-3] == 'i' ) && 
-                   (filename[size-2] == 'n' ) ) {
-                mem[REG_TLOOKUP+file_block_wr_pt++] = FILE_IS_ROM;
+        if (fatfs_mounted) {
+          file_block_wr_pt = 1;
+          if (mem[REG_TLOOKUP] > 0x7f) {
+            mem[REG_TLOOKUP] = 0;
+          }  
+          memcpy((void *)scratchpad, (void *)&mem[REG_TLOOKUP], 256);
+          f_closedir(&dir);
+          fres = f_findfirst(&dir, &entry, scratchpad, "*");
+          while ( (fres == FR_OK) && (entry.fname[0]) && (nbFiles<MAX_FILES) ) {  
+            if (!entry.fname[0]) {
+              f_closedir(&dir);
+              break;
+            }
+            bool valid = true;
+            char * filename = entry.fname;
+            int size = mystrncpy(&files[nbFiles][0], filename, MAX_FILENAME_SIZE-1); // including eol (0)
+            if (entry.fname[0] != '.' ) { // skip any MACOS file but also ".", ".."
+              // not a directory
+              if ( !(entry.fattrib & AM_DIR) ) {
+                if ( (size > 4) && 
+                     (filename[size-5] == '.' ) && 
+                     (filename[size-4] == 'p' ) && 
+                     (filename[size-3] == 'r' ) && 
+                     (filename[size-2] == 'g' ) ) {
+                  mem[REG_TLOOKUP+file_block_wr_pt++] = FILE_IS_PRG;
+                }
+                else   
+                if ( (size > 4) && 
+                     (filename[size-5] == '.' ) && 
+                     (filename[size-4] == 'b' ) && 
+                     (filename[size-3] == 'i' ) && 
+                     (filename[size-2] == 'n' ) ) {
+                  mem[REG_TLOOKUP+file_block_wr_pt++] = FILE_IS_ROM;
+                }
+                else {
+                  valid = false;
+                }
               }
               else {
-                valid = false;
+                mem[REG_TLOOKUP+file_block_wr_pt++] = FILE_IS_DIR;
               }
-            }
-            else {
-              mem[REG_TLOOKUP+file_block_wr_pt++] = FILE_IS_DIR;
-            }
-            if (valid == true) {
-              file_block_wr_pt += mystrncpy((char*)&mem[REG_TLOOKUP+file_block_wr_pt], filename, MAX_FILENAME_SIZE-1);
-              nbFiles++;
-            }  
-          }               
-          fres = f_findnext(&dir, &entry);
-        }   
+              if (valid == true) {
+                file_block_wr_pt += mystrncpy((char*)&mem[REG_TLOOKUP+file_block_wr_pt], filename, MAX_FILENAME_SIZE-1);
+                nbFiles++;
+              }  
+            }               
+            fres = f_findnext(&dir, &entry);
+          }
+        }
         mem[REG_TLOOKUP] = nbFiles;
         break;
       case cmd_readdir:
         nbFiles = 0;
-        file_block_wr_pt = 1;        
-        while ( (fres == FR_OK) && (entry.fname[0]) && (nbFiles<MAX_FILES) ) {  
-          if (!entry.fname[0]) {
-            f_closedir(&dir);
-            break;
-          }
-          bool valid = true;
-          char * filename = entry.fname;
-          int size = mystrncpy(&files[nbFiles][0], filename, MAX_FILENAME_SIZE-1); // including eol (0)
-          if (entry.fname[0] != '.' ) { // skip any MACOS file but also ".", ".."
-            // not a directory
-            if ( !(entry.fattrib & AM_DIR) ) {
-              if ( (size > 4) && 
-                   (filename[size-5] == '.' ) && 
-                   (filename[size-4] == 'p' ) && 
-                   (filename[size-3] == 'r' ) && 
-                   (filename[size-2] == 'g' ) ) {
-                mem[REG_TLOOKUP+file_block_wr_pt++] = FILE_IS_PRG;
-              }
-              else   
-              if ( (size > 4) && 
-                   (filename[size-5] == '.' ) && 
-                   (filename[size-4] == 'b' ) && 
-                   (filename[size-3] == 'i' ) && 
-                   (filename[size-2] == 'n' ) ) {
-                mem[REG_TLOOKUP+file_block_wr_pt++] = FILE_IS_ROM;
+        if (fatfs_mounted) {
+          file_block_wr_pt = 1;
+          while ( (fres == FR_OK) && (entry.fname[0]) && (nbFiles<MAX_FILES) ) {  
+            if (!entry.fname[0]) {
+              f_closedir(&dir);
+              break;
+            }
+            bool valid = true;
+            char * filename = entry.fname;
+            int size = mystrncpy(&files[nbFiles][0], filename, MAX_FILENAME_SIZE-1); // including eol (0)
+            if (entry.fname[0] != '.' ) { // skip any MACOS file but also ".", ".."
+              // not a directory
+              if ( !(entry.fattrib & AM_DIR) ) {
+                if ( (size > 4) && 
+                     (filename[size-5] == '.' ) && 
+                     (filename[size-4] == 'p' ) && 
+                     (filename[size-3] == 'r' ) && 
+                     (filename[size-2] == 'g' ) ) {
+                  mem[REG_TLOOKUP+file_block_wr_pt++] = FILE_IS_PRG;
+                }
+                else   
+                if ( (size > 4) && 
+                     (filename[size-5] == '.' ) && 
+                     (filename[size-4] == 'b' ) && 
+                     (filename[size-3] == 'i' ) && 
+                     (filename[size-2] == 'n' ) ) {
+                  mem[REG_TLOOKUP+file_block_wr_pt++] = FILE_IS_ROM;
+                }
+                else {
+                  valid = false;
+                }
               }
               else {
-                valid = false;
+                mem[REG_TLOOKUP+file_block_wr_pt++] = FILE_IS_DIR;
               }
-            }
-            else {
-              mem[REG_TLOOKUP+file_block_wr_pt++] = FILE_IS_DIR;
-            }
-            if (valid == true) {
-              file_block_wr_pt += mystrncpy((char*)&mem[REG_TLOOKUP+file_block_wr_pt], filename, MAX_FILENAME_SIZE-1);
-              nbFiles++;
-            }  
-          }               
-          fres = f_findnext(&dir, &entry); 
+              if (valid == true) {
+                file_block_wr_pt += mystrncpy((char*)&mem[REG_TLOOKUP+file_block_wr_pt], filename, MAX_FILENAME_SIZE-1);
+                nbFiles++;
+              }  
+            }               
+            fres = f_findnext(&dir, &entry); 
+          }
         }
         mem[REG_TLOOKUP] = nbFiles;
         break;
@@ -1241,11 +1236,10 @@ uint8_t readWord( uint16_t location)
     return basic4_d000[location-0xd000];
   } 
   else if (location < 0xe800) {
-#ifdef EIGHTYCOL    
-    return edit480[location-0xe000];
-#else 
-    return edit4[location-0xe000];
-#endif    
+    if (video_default == VMODE_LORES)      
+      return edit4[location-0xe000];
+    else
+      return edit480[location-0xe000];
   } 
   else if ( (location > 0xe800) && (location < 0xf000) ) {
     if (location == 0xe812)         // PORT B
@@ -1629,25 +1623,43 @@ int main()
 #endif
 #endif
 
-  mount_fatfs_disk();
-  fres = f_mount(&filesystem, "/", 1);
-  /*
-  if (fres != FR_OK) {
-      while (1) {};
-  }
-  else {
-
-    FIL fp;
-    fres = f_open(&fp, "adventure.prg", FA_READ);
-    if (fres == FR_OK) {
-        f_close(&fp);
-    } else {
-        while (1) {};
+  video_default = VMODE_HIRES;
+  fatfs_mounted = mount_fatfs_disk();
+  if (fatfs_mounted) {
+    fres = f_mount(&filesystem, "/", 1);
+    // read HYPERPET.CFG
+    if( !(f_open(&file, "HYPERPET.CFG" , FA_READ)) ) {
+      while (f_gets(scratchpad, 256, &file) != NULL)  {
+        if (!strncmp(scratchpad, "model=", 6)) {
+        }
+        else 
+        if (!strncmp(scratchpad, "columns=", 8)) {
+          if ( (scratchpad[8]=='8') && (scratchpad[9]=='0') ) {
+            video_default = VMODE_HIRES;
+          }
+          else 
+          if ( (scratchpad[8]=='4') && (scratchpad[9]=='0') ) {
+            video_default = VMODE_LORES;
+          }
+        }
+        else 
+        if (!strncmp(scratchpad, "ram=", 4)) {
+        }
+#ifndef HAS_PETIO
+        else 
+        if (!strncmp(scratchpad, "keyboard=", 9)) {
+          if ( ( scratchpad[9]=='u') && (scratchpad[10]=='k') ) {
+            kbd_set_locale(KLAYOUT_UK);
+          }
+          else if ( ( scratchpad[9]=='b') && (scratchpad[10]=='e') ) {
+            kbd_set_locale(KLAYOUT_BE);
+          }
+        }
+#endif        
+      }
+      f_close(&file);
     }
-    //f_unmount("/");
   }
-  */
-  memset((void*)&Bitmap[0],0, sizeof(Bitmap));
 
 #ifndef HAS_PETIO
   printf("Init Video...\n");
@@ -1661,11 +1673,6 @@ int main()
   printf("Init Audio...\n");
 #endif
   Core1Exec(AudioRenderInit);
-  //AudioRenderInit();
-
-#ifdef PETIO_A000
-  memcpy((void *)&mem_a000[0], (void *)fb, sizeof(fb));
-#endif 
 
 #ifdef HAS_PETIO
   // main loop

@@ -20,18 +20,20 @@
 #define KEY_PRESSED  1
 #define KEY_RELEASED 0
 
+typedef enum {
+	KLAYOUT_UK = 0,
+	KLAYOUT_BE,
+} KLAYOUT;
+
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* raw_key_down should be called whenever a key is pressed, anywhere.
- * The code should distinguish upper and lower case letters, and
- * symbols that appear on the same key, but no other processing.
- * For example, ctrl-A is 'A' with a flag to indicate that ctrl
- * is pressed. */
+/* raw_key_down should be called whenever a key is pressed
+ * or released. */
 extern void kbd_signal_raw_key(int keycode, int code, int codeshifted, int flags, int pressed);
-
+extern void kbd_set_locale(KLAYOUT layout);
 #ifdef __cplusplus
 }
 #endif

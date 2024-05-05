@@ -134,7 +134,7 @@ static inline bool is_sony_ds4(uint8_t dev_addr)
 // TODO: fill in the rest of the non-ASCII key codes
 // There's a nice list here:
 // https://gist.github.com/ekaitz-zarraga/2b25b94b711684ba4e969e5a5723969b
-static int conv_table_us[128][2] = 
+static int conv_table_uk[128][2] = 
 {
     {0     , 0      }, /* 0x00 */ \
     {0     , 0      }, /* 0x01 */ \
@@ -351,6 +351,8 @@ static int conv_table_be[128][2] =
     { 0   , 0       }, /* 0x67 */ \
 };
 
+static KLAYOUT klayout = KLAYOUT_UK;
+
 
 /* =================  End keycode translation table. ================== */
 
@@ -402,8 +404,16 @@ static void process_kbd_report (hid_keyboard_report_t const *report)
   {
     if (report->keycode[i]) 
     {
-      int ch = conv_table_be[report->keycode[i]][0];
-      int chshift = conv_table_be[report->keycode[i]][is_lshift_pressed?1:0];
+      int ch; 
+      int chshift;
+      if (klayout == KLAYOUT_UK) {
+        ch = conv_table_uk[report->keycode[i]][0];
+        chshift = conv_table_uk[report->keycode[i]][(is_lshift_pressed?1:0)];
+      }
+      else if (klayout == KLAYOUT_BE) {
+        ch = conv_table_be[report->keycode[i]][0];
+        chshift = conv_table_be[report->keycode[i]][(is_lshift_pressed?1:0)];
+      }
       int flags = 0;
       if (is_lshift_pressed) flags |= KBD_FLAG_LSHIFT;
       if (is_lctrl_pressed) flags |= KBD_FLAG_LCONTROL;
@@ -596,4 +606,9 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
     printf("Error: cannot request to receive report\r\n");
   }
   */
+}
+
+void kbd_set_locale(KLAYOUT layout)
+{
+  klayout = layout;
 }
