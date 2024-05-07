@@ -8,31 +8,34 @@ The HyperPET pico project intents to upgrade the PET to a modern 6502 system, wi
 Initially the purpose of the project was to offer VGA output to the PET.<br>
 At this point of time, the HyperPET pico project supports:<br>
 * VGA output up to 640x200 (80 colums)
-* SID sound emulation
 * extended graphical modes including (640/320/256)x200 resolutions in 256 colors.
-* 16 flippable sprites (reusable up to 128)
+* 16 "flippable" sprites (reusable up to 128)
 * dual layers: 2 tiles layers or tiles+text with smooth scrolling
 * 320x200 bitmap mode (256 colors) on the lower layer
-* background color/raster colors
-* extra 4K RAM in $a000 (so far 1 bank, may be more in future!)
-* OR selectable ROM in $a000 (via File Browser)
-* 1MB flash storage (ro) accessible via the resident File Browser (sys40960)
+* background color/line raster colors
+* SID sound emulation
+* extra 4K RAM in $a000 (1 bank, may be more in future!)
+* OR selectable ROM in $a000 (via resident File Browser)
+* 1MB flash storage for programs (ro), accessible via the resident File Browser (sys40960)
 * possibility to emulate the EDIT ROM (e.g. 60Hz in a PAL machine)
+* possibility to toggle 80 to 40 columns on the real PET monitor (AnyHZ routine via the resident File Browser)
 
 <br>
 
 The HyperPET pico exists in 2 boards<br>
 * The inner board (residing inside the PET) multiplexing the memory expansion connectors to the outside
-* The outer board, as a plugin module, offering all the new features (VGA/audio connectors)
+* The outer board, as a plugin module, offering all the new features (with VGA/audio output)
 
 <br>
 
-The picture on the PET monitor is mirrored to VGA by default.<br>
+The picture on the PET monitor is mirrored to VGA by default (80/40 columns modes)<br>
 Programs can be loaded (via tape emulation, or modern devices as PETdisk or PETdisk MAX 2 or the resident File Browser)<br>
-As soon a program make uses of extended graphics capabilities, only VGA will show it<br>
-The rest of the PET hardware is just used for its CPU, RAM, ROM, keyboard, PIA, VIA ...<br>
-New registers are available through the $9000-$9FFF region (R/W)<br>
-The region $A000-$AFFF is available as extra RAM or to store custom ROMs (File Browser as default).
+As soon a program make uses of extended graphics capabilities, only VGA will show it/them<br>
+The rest of the PET hardware is just used normally (CPU, RAM, ROM, keyboard, PIA, VIA ...)<br>
+New registers are available through the memory region $9000-$9FFF (R/W)<br>
+The region $A000-$AFFF is available as extra RAM (R/W) or to store custom ROMs (the File Browser being the default).
+The region $E000-$E7FF can be optionnaly emulated if the EDIT rom is removed from its socket.
+At any moment, the resident File Browser can be invoked using the command sys40960 from the BASIC.
 
 <br>
 
