@@ -6,11 +6,11 @@ Today the PET deserves a modern hardware expansion board!<br>
 This project intents to upgrade the PET to a modern 6502 computer.<br>
 <br>
 Initially the purpose of the project was to offer VGA output to the PET.<br>
-At this point of time, the hyperpetpico project supports:<br>
+At this point of time, the HyperPET pico project supports:<br>
 * VGA output up to 640x200 (80 colums)
 * SID sound emulation
-* extended graphical modes supporting (640/320/256)x200 resolution in 256 colors.
-* 16 sprites (reusable up to 128)
+* extended graphical modes including (640/320/256)x200 resolutions in 256 colors.
+* 16 flippable sprites (reusable up to 128)
 * dual layers: 2 tiles layers or tiles+text with smooth scrolling
 * 320x200 bitmap mode (256 colors) on the lower layer
 * background color/raster colors
@@ -21,7 +21,7 @@ At this point of time, the hyperpetpico project supports:<br>
 
 <br>
 
-The hyperperpico exists in 2 boards<br>
+The HyperPET pico exists in 2 boards<br>
 * The inner board (residing inside the PET) multiplexing the memory expansion connectors to the outside
 * The outer board, as a plugin module, offering all the new features (VGA/audio connectors)
 
@@ -29,18 +29,18 @@ The hyperperpico exists in 2 boards<br>
 
 The picture on the PET monitor is mirrored to VGA by default.<br>
 Programs can be loaded (via tape emulation, or modern devices as PETdisk or PETdisk MAX 2 or the resident File Browser)<br>
-As soon a program make uses of extended graphics capabilities, only VGA is usable<br>
-The rest of the PET hardware is just used for its CPU,RAM,ROM,keyboard,PIA,VIA ...<br>
-New registers are available through the 9000-9fff region (R/W)<br>
-The region a000-afff is available as extra RAM or to store custom ROMs (File Browser as default).
+As soon a program make uses of extended graphics capabilities, only VGA will show it<br>
+The rest of the PET hardware is just used for its CPU, RAM, ROM, keyboard, PIA, VIA ...<br>
+New registers are available through the $9000-$9FFF region (R/W)<br>
+The region $A000-$AFFF is available as extra RAM or to store custom ROMs (File Browser as default).
 
 <br>
 
-To ease development, the second module can be used as a standalone PET emulator<br>
-* the CPU,RAM,ROM,PIA,VIA are emulated
-* an OTG USB keyboard can be used to interract
-* all new GFX/sound features are available for development 
-* developed programs can be injected over WiFI for testing (TFTP server)
+To ease development, the plugin module can be used as a standalone PET system<br>
+* the CPU, RAM (32K), ROM, PIA, VIA are emulated
+* a OTG USB keyboard can be used to interract
+* all new GFX/sound features can be used for development 
+* developed programs can be injected over WiFI for testing (via TFTP server)
 
 ## Initial prototypes
 <p align="left">
@@ -62,19 +62,20 @@ To ease development, the second module can be used as a standalone PET emulator<
   * the "/prgs" subdir contains few examples, you can copy for e.g. basic,demos,petscii and roms subdirectories to HP-PICOCARD
 * flash the hyperpetpico application to the PICO
   * power the PICO while pressing the button (uf2 programming mode)
-  * drag and drop "bin/hyperpetpicopetio.uf2" if you intent to use the hyperpet module on a real PET
+  * drag and drop "bin/hyperpetpicopetio.uf2" if you intent to use the HyperPET module on a real PET
   * OR drag and drop "bin/hyperpetpicoemuwifi.uf2" if you intent to use the module as standalone emulator
-* the module is ready to use! 
+* the HyperPET module is ready to use! 
 * on a real pet:
   * install the innerboard inside the PET8032, on the memory expansion slots
-  * plug the module to the inner board connector comming at the side of the pet
+  * cut the 9xxx pullup and connect the CS wire (see picture)
+  * plug the HyperPET module to the inner board connector comming at the side of the pet
   * connect VGA and audio 
-  * power the module via USB cable
+  * power the HyperPET module via USB cable
   * finally (and only at the end), power the PET
-* as standalone emulator:
+* as standalone system:
   * connect VGA and audio 
   * connect a USB keyboard via a USB power splitter cable (keyboard layout via "HYPERPET.CFG")
-  * power the module via USB    
+  * power the HyperPET module via USB    
 
 ## Build procedure
 * install the ARM compiler (see PICO documentation)
