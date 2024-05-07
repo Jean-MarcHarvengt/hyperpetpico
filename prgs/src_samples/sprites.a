@@ -115,7 +115,8 @@ NB_SPRITES_TOTAL        = 96
 ;        lda #2                  ; 256x200 (32x25)
 ;        sta REG_VIDEO_MODE
 
-
+        lda #4+2+1
+        sta REG_LAYERS_CFG
 
         lda #9                   ; transfer mario: 8 bits no clut
         sta REG_TDEPTH

@@ -330,8 +330,12 @@ exit:
         sta REG_XSCROLL_L1      
         lda #0                  ; 640x200
         sta REG_VIDEO_MODE
-
-
+        lda #$00                ; restore background color
+        sta REG_BG_COL
+        ldx #$00                ; restore background rasters
+cras1:  sta REG_LINES_BG_COL,x
+        inx
+        bne cras1
         rts
 
 ;-------------------------------------------------------------

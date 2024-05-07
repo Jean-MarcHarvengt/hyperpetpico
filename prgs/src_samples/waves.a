@@ -140,7 +140,36 @@ ROW_END   = 12
         sta $90+1
         cli
 
+
+WAIT_KEY
+        jsr $FFE4               ; Calling KERNAL GETIN 
+        beq WAIT_KEY
+        cmp #$20                ; space to exit else restart
+        bne WAIT_KEY
+
+exit:    
+        lda #$03                ; Petfont + bitmap + no sprites
+        sta REG_LAYERS_CFG
+        lda #$00                ; Reset tile config
+        sta REG_TILES_CFG 
+
+        ldy #$00
+        lda #$00
+restore:        
+        sta REG_LINES_XSCR_HI,y
+        sta REG_LINES_L1_XSCR,y
+        iny
+        bne restore
+
+restore_int:
+        sei
+        lda $033d
+        sta $90
+        lda $033d+1
+        sta $90+1
+        cli
         rts
+
 
 
 
