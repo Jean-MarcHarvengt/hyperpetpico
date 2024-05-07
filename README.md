@@ -16,30 +16,31 @@ At this point of time, the hyperpetpico project supports:<br>
 * background color/raster colors
 * extra 4K RAM in $a000 (so far 1 bank, may be more in future!)
 * OR selectable ROM in $a000 (via File Browser)
-* 1MB flash storage (ro) accessible via resident File Browser (sys40960)
+* 1MB flash storage (ro) accessible via the resident File Browser (sys40960)
+* possibility to emulate the EDIT ROM (e.g. 60Hz in a PAL machine)
 
 <br>
 
-The hyperperpico exists as 2 modules<br>
-* a first module (residing inside the PET) multiplexing the memory expansion connectors to the outside
-* a second module, as a plugin board, offering all the new features (VGA/audio connectors)
+The hyperperpico exists in 2 boards<br>
+* The inner board (residing inside the PET) multiplexing the memory expansion connectors to the outside
+* The outer board, as a plugin module, offering all the new features (VGA/audio connectors)
 
 <br>
 
 The picture on the PET monitor is mirrored to VGA by default.<br>
-Programs can be loaded (via tape emulation, or modern devices as PETdisk or PETdisk MAX 2 or the File Browser)<br>
+Programs can be loaded (via tape emulation, or modern devices as PETdisk or PETdisk MAX 2 or the resident File Browser)<br>
 As soon a program make uses of extended graphics capabilities, only VGA is usable<br>
 The rest of the PET hardware is just used for its CPU,RAM,ROM,keyboard,PIA,VIA ...<br>
-New registers are available through 9000-9fff region (R/W)<br>
-Region a000-afff is available as extra RAM or to store custom roms (File Browser as default).
+New registers are available through the 9000-9fff region (R/W)<br>
+The region a000-afff is available as extra RAM or to store custom ROMs (File Browser as default).
 
 <br>
 
 To ease development, the second module can be used as a standalone PET emulator<br>
 * the CPU,RAM,ROM,PIA,VIA are emulated
-* a OTG USB keyboard can be used
-* new GFX/sound features are available for development 
-* developed programs can be injected over WiFI for testing
+* an OTG USB keyboard can be used to interract
+* all new GFX/sound features are available for development 
+* developed programs can be injected over WiFI for testing (TFTP server)
 
 ## Initial prototypes
 <p align="left">
@@ -51,31 +52,32 @@ To ease development, the second module can be used as a standalone PET emulator<
 ## Installation procedure
 * all PICO binaries are part of the repository in the "/bin" subdir.
 * refer to the PICO documentation for more details about how to flash it
-* format the 1MB flash storage (one time operation)
+* format the 1MB hyperpet flash storage (one time operation)
   * power the PICO while pressing the button (uf2 programming mode)
-  * program the filesystem exposure utility by drag and drop of the file "/bin/flashfs_mount_or_create+mount.uf2" on the PICO icon
+  * program the "filesystem exposure utility" by drag and drop of the file "/bin/flashfs_mount_or_create+mount.uf2" on the PICO storage
   * When the flashing is finished, another mass storage icon HP-PICOCARD will appear representing the 1MB available for the hyperpet
   * by default HP-PICOCARD contains the file "HYPERPET.CFG".
-  * this file is mostly relevant in stadalone mode. You can change the options in the file using an editor 
+  * this file contains the default configuration. You can change the options in the file using an editor (e.g. boot in 40 colums if you have a 4032 PET) 
 * drag and drop all the programs you want to the HP-PICOCARD USB storage device
   * the "/prgs" subdir contains few examples, you can copy for e.g. basic,demos,petscii and roms subdirectories to HP-PICOCARD
 * flash the hyperpetpico application to the PICO
   * power the PICO while pressing the button (uf2 programming mode)
   * drag and drop "bin/hyperpetpicopetio.uf2" if you intent to use the hyperpet module on a real PET
   * OR drag and drop "bin/hyperpetpicoemuwifi.uf2" if you intent to use the module as standalone emulator
-* the module is ready to use 
-* on a real pet
-  * install the innerboard inside the PET8032, on the memory expansion bus
-  * plug the module to the inner board connector at the side of the pet
+* the module is ready to use! 
+* on a real pet:
+  * install the innerboard inside the PET8032, on the memory expansion slots
+  * plug the module to the inner board connector comming at the side of the pet
   * connect VGA and audio 
   * power the module via USB cable
-  * finally and only finally, power the PET
-* as standalone emulator
+  * finally (and only at the end), power the PET
+* as standalone emulator:
   * connect VGA and audio 
   * connect a USB keyboard via a USB power splitter cable (keyboard layout via "HYPERPET.CFG")
   * power the module via USB    
 
 ## Build procedure
+* install the ARM compiler (see PICO documentation)
 * install PICO-SDK (or update it by pulling from the github)
   * git clone -b master https://github.com/raspberrypi/pico-sdk.git
   * cd pico-sdk/
@@ -107,6 +109,6 @@ Hyperpetpico reuse or is inspired from the code of below projects
 * [Pucrunch compressor for 6502 CPU](https://github.com/mist64/pucrunch)
 * [reSID emulator](https://en.wikipedia.org/wiki/ReSID)
 * [Teensy-reSID](https://github.com/FrankBoesing/Teensy-reSID)
-* [A8PicoCart]( (https://github.com/robinhedwards/A8PicoCart)
+* [A8PicoCart](https://github.com/robinhedwards/A8PicoCart)
 * [MOS6502](https://github.com/gianlucag/mos6502)
 
