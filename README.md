@@ -1,5 +1,5 @@
 # HyperPET pico expansion for PET 4032/8032
-The commodore PET is the father of all personal computers.<br>
+The commodore PET is the father of all Personal Computers.<br>
 The model 8032 remains a impressive machine (professional keyboard, 80 colums, 32K RAM...)<br>
 <br>
 Today the PET deserves a modern hardware expansion board!<br>
