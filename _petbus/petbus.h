@@ -34,7 +34,7 @@
 // 9b01: background color (RGB332)
 // 9b02: layers config
 //       0: L0 on/off
-//       1: L1 on/off                   (off if HIRES and bitmap in L0!)
+//       1: L1 on/off
 //       2: L2 on/off
 //       3: L2 sprites between L0 and L1
 //       4: bitmap/tile in L0

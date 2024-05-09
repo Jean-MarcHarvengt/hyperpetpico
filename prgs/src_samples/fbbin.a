@@ -111,10 +111,11 @@ WAIT2:
         bpl WAIT_KEY
         sec
         sbc #$30
-        cmp nbfiles
-        bpl WAIT_KEY
         tax                     ; key to index
         lda key2index,x
+
+        cmp nbfiles
+        bpl WAIT_KEY
         pha
         tax
         lda filetypes,x
@@ -718,7 +719,7 @@ footer2
 !text "(0-9) LOAD FILE/OPENDIR     DOWN=TOPDIR"
 !byte 0
 
-filetypes:
+filetypes
 !byte 0,0,0,0,0,0,0,0,0,0
 filenames:
 line0:

@@ -116,7 +116,10 @@ NB_SPRITES_TOTAL        = 96
 
 *= $0800
 
-
+        lda REG_LAYERS_CFG
+        pha
+        lda #$12 
+        sta REG_LAYERS_CFG
         sei
 wait1
         lda REG_VSYNC
@@ -151,6 +154,8 @@ exit:
         lda #$00                ; Restore BG color
         sta REG_BG_COL
         cli
+        pla
+        sta REG_LAYERS_CFG
         rts
 
 
