@@ -14,6 +14,7 @@ REG_TCOMMAND      = $9b11
 REG_TPARAMS       = $9b12
 REG_TDATA         = $9b13
 REG_TSTATUS       = $9b14
+REG_PALNTSC       = $9b15
 
 ROWLEN     = 80
 ROWLEN_LO  = 40
@@ -79,7 +80,10 @@ hic:
 WAIT_KEY
         jsr $FFE4               ; Calling KERNAL GETIN 
         beq WAIT_KEY
-        cmp #$1d                ; =>   next page
+        cmp #$41                ; A 
+        bne WAIT0   
+        jmp togglehz
+WAIT0:  cmp #$1d                ; =>   next page
         beq nextpage
         cmp #$0d
         beq exit
@@ -187,7 +191,16 @@ by4:    adc #0                  ;+*16 = *20
         jsr clear_screen
         jmp loop
 
-
+togglehz:
+        lda REG_PALNTSC
+        beq pal
+        dec REG_PALNTSC
+        jsr print_file_menu
+        jmp WAIT_KEY
+pal:
+        inc REG_PALNTSC
+        jsr print_file_menu
+        jmp WAIT_KEY
 
 ;-------------------------------------------------------------
 append_filename_to_dir:
@@ -367,9 +380,16 @@ print_file_menu:
         lda #<footer1           ; footer1
         ldx #>footer1
         ldy #13
-        jsr print        
-        lda #<footer2           ; footer2
-        ldx #>footer2
+        jsr print
+        lda REG_PALNTSC
+        bne print_f0
+        lda #<footer250         ; footer2
+        ldx #>footer250
+        jmp print_f1
+print_f0:
+        lda #<footer260
+        ldx #>footer260
+print_f1:
         ldy #14
         jsr print
         lda #<directory         ; footer3
@@ -715,8 +735,11 @@ header
 footer1
 !text "RIGHT=PAGE RET=EXIT SPC=LORES DEL=RESET"
 !byte 0
-footer2
-!text "(0-9) LOAD FILE/OPENDIR     DOWN=TOPDIR"
+footer250
+!text "(0-9) LOAD/OPENDIR  DOWN=TOPDIR  A=50HZ"
+!byte 0
+footer260
+!text "(0-9) LOAD/OPENDIR  DOWN=TOPDIR  A=60HZ"
 !byte 0
 
 filetypes

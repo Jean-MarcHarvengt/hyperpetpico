@@ -2,12 +2,6 @@
 
 #ifdef HAS_PETIO
 #include "petbus.pio.h"
-#ifdef PETIO_EDIT
-//#include "edit4.h"
-#include "edit480.h"
-//#include "edit450.h"
-#include "edit48050.h"
-#endif
 #endif
 
 // PET shadow memory 8000-9fff
@@ -15,6 +9,10 @@ unsigned char mem[0x2000];
 // PET shadow memory a000-afff
 #ifdef PETIO_A000
 unsigned char mem_a000[0x1000];
+#endif
+// PET shadow memory e000-a7ff
+#ifdef PETIO_EDIT
+unsigned char mem_e000[0x0800];
 #endif
 bool font_lowercase = false;
 
@@ -36,11 +34,6 @@ const uint smread = 1;
 #define RESET_TRESHOLD 15000
 static uint32_t reset_counter = 0;
 static bool got_reset = false;
-
-#ifdef PETIO_EDIT
-static unsigned char mem_e000[0x0800];
-static bool edit8050 = true;
-#endif
 
 extern uint8_t cmd;
 
@@ -183,12 +176,6 @@ static void __not_in_flash("writeE000") writeE000(uint32_t address, uint8_t valu
       font_lowercase = false;
     }
   }
-#ifdef PETIO_EDIT
-  else if ( address == 0xe000)
-  {
-    edit8050 = (value &= 0xff)?false:true;
-  }
-#endif
 }
 
 static void __not_in_flash("writeFuncTable") (*writeFuncTable[16])(uint32_t,uint8_t)
@@ -238,15 +225,6 @@ void __not_in_flash("__time_critical_func") petbus_loop(void) {
 ********************************/ 
 void petbus_init(void)
 { 
-#ifdef PETIO_EDIT
-  if (edit8050) {
-    memcpy((void *)&mem_e000[0], (void *)&edit48050[0], 0x800);
-  }
-  else {
-    memcpy((void *)&mem_e000[0], (void *)&edit480[0], 0x800);
-  }
-#endif
-
   // Init PETBUS read SM
   uint progra_offsetread = pio_add_program(pio, &petbus_device_read_program);
   pio_sm_claim(pio, smread);
@@ -358,18 +336,6 @@ extern bool petbus_poll_reset(void)
     reset_counter = 0;
   }
   return retval;
-}
-
-extern void petbus_reset(void)
-{
- #ifdef PETIO_EDIT        
-  if (edit8050) {
-    memcpy((void *)&mem_e000[0], (void *)&edit48050[0], 0x800);
-  }
-  else {
-    memcpy((void *)&mem_e000[0], (void *)&edit480[0], 0x800);
-  }
-#endif 
 }
 
 #endif

@@ -14,8 +14,6 @@
 #include "basic4_b000.h"
 #include "basic4_c000.h"
 #include "basic4_d000.h"
-#include "edit4.h"
-#include "edit480.h"
 #include "kernal4.h"
 #ifdef HAS_NETWORK
 #include "lwip/apps/tftp_server.h"
@@ -33,7 +31,6 @@ extern "C" void hid_app_task(void);
 
 #include <stdio.h>
 #include <ctype.h>
-//#include "flash.h"
 #include "fatfs_disk.h"
 #include "ff.h"
 
@@ -41,6 +38,10 @@ extern "C" void hid_app_task(void);
 #include "fb.h"
 #include "vsync.h"
 #endif         
+#include "edit4.h"
+#include "edit480.h"
+#include "edit450.h"
+#include "edit48050.h"
 
 // Graphics
 #define VGA_RGB(r,g,b)   ( (((r>>5)&0x07)<<5) | (((g>>5)&0x07)<<2) | (((b>>6)&0x3)<<0) )
@@ -554,9 +555,12 @@ void __not_in_flash("VideoRenderLineL1") VideoRenderLineL1(u8 * linebuffer, int 
 
 static void VideoRenderInit(void)
 {
-  // initialize shared memory
-  memset((void*)&mem[0x0000], 0, 0x2000); // text/tilemap...
-  // initialize GFX memory
+  // initialize shared memory but preserve freq (only if PETIO_EDIT is enabled)
+  uint8_t palntsc = mem[REG_PALNTSC];
+  memset((void*)&mem[0x0000], 0, 0x2000); // all registers and videomem
+  mem[REG_PALNTSC] = palntsc;
+
+  // initialize GFX memory (bitmap,sprites,tiles)
   ResetGFXMem();
   
 #ifdef PETIO_A000
@@ -640,6 +644,26 @@ static void SystemReset(void)
   VideoRenderInit();
   pwm_audio_reset();
 }
+
+#ifdef HAS_PETIO
+#ifdef PETIO_EDIT
+static void InstallEditRom(void)
+{  
+  if (mem[REG_PALNTSC] == 0) {
+    if (video_default == VMODE_LORES)    
+      memcpy((void *)&mem_e000[0], (void *)&edit450[0], 0x800);
+    else
+      memcpy((void *)&mem_e000[0], (void *)&edit48050[0], 0x800);
+  }
+  else {
+    if (video_default == VMODE_LORES)    
+      memcpy((void *)&mem_e000[0], (void *)&edit4[0], 0x800);
+    else
+      memcpy((void *)&mem_e000[0], (void *)&edit480[0], 0x800);
+  }
+}
+#endif 
+#endif
 
 // ****************************************
 // PET memory access 
@@ -1236,10 +1260,18 @@ uint8_t readWord( uint16_t location)
     return basic4_d000[location-0xd000];
   } 
   else if (location < 0xe800) {
-    if (video_default == VMODE_LORES)      
-      return edit4[location-0xe000];
-    else
-      return edit480[location-0xe000];
+    if (mem[REG_PALNTSC] == 0) { 
+      if (video_default == VMODE_LORES)      
+        return edit450[location-0xe000];
+      else
+        return edit48050[location-0xe000];
+    } 
+    else {
+      if (video_default == VMODE_LORES)      
+        return edit4[location-0xe000];
+      else
+        return edit480[location-0xe000];
+    }    
   } 
   else if ( (location > 0xe800) && (location < 0xf000) ) {
     if (location == 0xe812)         // PORT B
@@ -1600,6 +1632,9 @@ int main()
 
   stdio_init_all();
 
+  // PAL mode (only relevant if PETIO_EDIT enabled)
+  mem[REG_PALNTSC] = 0;
+
 #ifdef HAS_PETIO
   petbus_init();
 #else
@@ -1675,14 +1710,11 @@ int main()
   Core1Exec(AudioRenderInit);
 
 #ifdef HAS_PETIO
+#ifdef PETIO_EDIT
+  InstallEditRom();
+#endif 
   // main loop
-  petbus_loop();
-  /*
-  while (true)
-  {
-  }
-  */
-    
+  petbus_loop();    
 #else
   printf("Init Emu...\n");
   pet_start();
@@ -1791,7 +1823,9 @@ void Core1Call(void) {
 #ifdef HAS_PETIO
     if (pet_reset) {
       pet_reset = false;
-      petbus_reset();
+#ifdef PETIO_EDIT
+      InstallEditRom();
+#endif 
       SystemReset();
     }     
 #endif

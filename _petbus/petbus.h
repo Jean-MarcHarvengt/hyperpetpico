@@ -109,6 +109,10 @@
 // 5. write data sequence (N bytes/packed_bits)
 // 6. write transfer=0 to reset
 //
+// 9b15: pal/ntsc (for PAL machine only)
+// 0 = PAL
+// 1 = NTSC
+//
 // 9b18-9b37: 32 (re)SID registers (d400 on C64)
 
 // 9b38-9bff: lines background color (RGB332)
@@ -149,6 +153,7 @@
 #define REG_TPARAMS       (0x9b12 - 0x8000) // 39698
 #define REG_TDATA         (0x9b13 - 0x8000) // 39699
 #define REG_TSTATUS       (0x9b14 - 0x8000) // 39700
+#define REG_PALNTSC       (0x9b15 - 0x8000) // 39700
 
 #define REG_SID_BASE      (0x9b18 - 0x8000) // 39704
 
@@ -234,6 +239,9 @@ extern unsigned char mem[0x2000];
 #ifdef PETIO_A000
 extern unsigned char mem_a000[0x1000];
 #endif
+#ifdef PETIO_EDIT
+extern unsigned char mem_e000[0x0800];
+#endif
 extern bool font_lowercase;
 
 #define CMD_QUEUE_SIZE 256
@@ -274,7 +282,6 @@ typedef enum {
 extern void petbus_init(void);
 extern void petbus_loop(void);
 extern bool petbus_poll_reset(void);
-extern void petbus_reset(void);
 #endif
 
 #endif
