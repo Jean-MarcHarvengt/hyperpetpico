@@ -39,6 +39,8 @@ relocate:
         sta reloc+$100*8,x
         lda start+$100*9,x
         sta reloc+$100*9,x
+        lda start+$100*10,x
+        sta reloc+$100*10,x
         inx
         bne relocate
         cli
