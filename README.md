@@ -5,7 +5,7 @@ The model 8032 remains a impressive machine (professional keyboard, 80 colums, 3
 Today the PET deserves a modern hardware expansion board!<br>
 The HyperPET pico project intents to upgrade the PET to a modern 6502 system, with improved graphics and sound capabilities.<br>
 <br>
-Have a look to the YouTube videos:<br>
+Have a look at the YouTube videos:<br>
 [HyperPET pico Introduction](https://youtu.be/iDc6OViZffg?si=Qh3PRVBwq7JelLfL)<br>
 [HyperPET pico In Standalone Mode](https://youtu.be/M_f5vOrPuFs?si=RCkrxrRP44IA1p1Q)<br>
 <br>
@@ -108,6 +108,13 @@ To ease development, the plugin module can be used as a standalone PET system<br
 * accesspoint :	hyperpetpico
 * passwd      :   picopet123
 * IP address  :	192.168.123.1
+
+## Hardware modification
+* this is required to allow the CPU to read the PICO memory range $9000-$FFFF and not only $9000-$9fff 
+* as such, emulate ROMs in $A000 and above
+<p align="center"> 
+<img src="/images/mod.png" width="240" height="120" />  
+</p>
 
 ## Special credits
 Hyperpetpico reuse or is inspired from the code of below projects
