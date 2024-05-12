@@ -112,8 +112,8 @@ To ease development, the plugin module can be used as a standalone PET system<br
 ## Hardware modification
 * this is required to allow the CPU to read the PICO memory range $9000-$FFFF and not only $9000-$9fff 
 * as such, emulate ROMs in $A000 and above
-<p align="center"> 
-<img src="/images/mod.png" width="240" height="120" />  
+<p align="left"> 
+<img src="/images/mod.png" width="320" height="240" />  
 </p>
 
 ## Special credits
