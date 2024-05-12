@@ -5,7 +5,7 @@ The model 8032 remains a impressive machine (professional keyboard, 80 colums, 3
 Today the PET deserves a modern hardware expansion board!<br>
 The HyperPET pico project intents to upgrade the PET to a modern 6502 system, with improved graphics and sound capabilities.<br>
 <br>
-Have a look to the YouTube videos<br>
+Have a look to the YouTube videos:<br>
 [HyperPET pico Introduction](https://youtu.be/iDc6OViZffg?si=Qh3PRVBwq7JelLfL)<br>
 [HyperPET pico Standalone Mode](https://youtu.be/DGkdKALkrKY?si=g0ceSnHtXlFhdA3E)<br>
 <br>
