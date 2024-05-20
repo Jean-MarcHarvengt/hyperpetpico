@@ -8,6 +8,9 @@ The HyperPET pico project intents to upgrade the PET to a modern 6502 system, wi
 Have a look at the YouTube videos:<br>
 [HyperPET pico Introduction](https://youtu.be/iDc6OViZffg?si=Qh3PRVBwq7JelLfL)<br>
 [HyperPET pico In Standalone Mode](https://youtu.be/M_f5vOrPuFs?si=RCkrxrRP44IA1p1Q)<br>
+[HyperPET pico Development Tutorial (Part1)](https://youtu.be/jMDLSFkoZOY?si=usY0yMmvYy1-EHls)<br>
+
+
 <br>
 Initially the purpose of the project was to offer VGA output to the PET.<br>
 At this point of time, the HyperPET pico project supports:<br>
