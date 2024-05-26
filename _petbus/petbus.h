@@ -19,37 +19,49 @@
 // (1) 320x200 also in HIRES
 
 //
-// 8000-87ff: videomem standard petfont text map L1 (fmap1)
+// 8000-87ff: videomem standard petfont text map in L1 (fmap1)
 //            (83ff for 4032, 87ff for 8032) 
-// 8800-8fff: videomem expanded tiles map L1 (tmap1)
-// 9000-97ff: videomem expanded tiles map L0 (tmap0)
+// 8800-8fff: videomem expanded tiles map in L1 (tmap1)
+// 9000-97ff: videomem expanded tiles map in L0 (tmap0)
+//            tile id 0-255 in 8x8   tile mode
+//            tile id 0-63  in 16x16 tile mode
 //
 // 9800-99ff: MAX 128 sprites registers (id,xhi,xlo,y)
-//            id:    0-5
-//            hflip: 6
-//            vflip: 7
+//       id:    0-5 (max 63)
+//       hflip: 6
+//       vflip: 7
+//
 // 9a00-9aff: transfer lookup (if used as color palette, 256 RGB332 colors)
+//       RGB332
+//       R: 5-7, 0x20 -> 0xe0   xxx --- --
+//       G: 2-4, 0x04 -> 0x1c   --- xxx -- 
+//       B: 0-1, 0x00 -> 0x03   --- --- xx    
+//
 // 9b00: video mode 
 //       0-1: resolution (0=640x200,1=320x200,2=256x200)
+//
 // 9b01: background color (RGB332)
+//
 // 9b02: layers config
-//       0: L0 on/off
-//       1: L1 on/off
-//       2: L2 on/off
-//       3: L2 sprites between L0 and L1
-//       4: bitmap/tile in L0
-//       5: petfont/tile in L1
+//       0: L0 on/off (1=on)
+//       1: L1 on/off (1=on)
+//       2: L2 on/off (1=on)
+//       3: L2 sprites between L0 and L1 (0 = sprites top)
+//       4: bitmap/tile in L0 (0=bitmap)
+//       5: petfont/tile in L1 (0=font)
 //       6: enable scroll area in L0
 //       7: enable scroll area in L1
+//
 // 9b03: lines config 2
 //       0: single/perline background color
 //       1: single/perline L0 xscroll
 //       2: single/perline L1 xscroll
-// 9b04: xscroll hi registers
-//       3-0: L0 xscroll hi
-//       7-4: L1 xscroll hi
-// 9b05: L0 xscroll lo
-// 9b06: L1 xscroll lo
+//
+// 9b04: xscroll HI registers
+//       3-0: L0 xscroll HI
+//       7-4: L1 xscroll HI
+// 9b05: L0 xscroll LO
+// 9b06: L1 xscroll LO
 // 9b07: L0 yscroll
 // 9b08: L1 yscroll
 // 9b09: L0 scroll area's line start (0-24)
@@ -60,17 +72,18 @@
 //       4-0
 // 9b0c: L1 scroll area's line end
 //       4-0
+//
 // 9b0d: foreground color (RGB332)
 //
 // 9b0e: tiles config
 //       0: L0: 0=8x8, 1=16x16
 //       1: L1: 0=8x8, 1=16x16
 //       2-4: xcurtain
-//        0: on/off
-//        1: 8/16 pixels left
+//            0: on/off
+//            1: 8/16 pixels left
 //       5-7: ycurtain
-//        0: on/off
-//        1: 8/16 pixels top
+//            0: on/off
+//            1: 8/16 pixels top
 //
 // 9b0f: vsync line (0-200, 200 is overscan)
 //
@@ -88,40 +101,42 @@
 //       6: transfer all tile 8bits data compressed (data=sizeh,sizel,pixels)
 //       7: transfer all sprite 8bits data compressed (data=sizeh,sizel,pixels)
 //       8: transfer bitmap 8bits data compressed (data=sizeh,sizel,pixels)
-
+//
 // 9b12: transfer params (WR)
 // 9b13: transfer data   (RD/WR)
-// 9b14: transfer status (RD)
+// 9b14: transfer status (RD) 1=ready
 //
 // Redefining tiles/sprite sequence
 // 1. write lookup palette entries needed
-// 2. write transfer mode
+// 2. write transfer mode (1/2/4/8/9)
 // 3. write command 1/2
-// 4. write params tile/sprite NR,w,h
-// 5. write data sequence (8bytes*plane for tiles, 24*2*plane for sprites)
-// 6. write new command to reset
+// 4. write params tile/sprite id,w,h
+// 5. write data sequence (8bytes*plane for tiles, (h*2)bytes*plane for sprites)
+// (any new command to reset)
 //
 // Transfer bitmap sequence
 // 1. write lookup palette entries needed
-// 2. write transfer mode
+// 2. write transfer mode (1/2/4/8/9)
 // 3. write command 3
 // 4. write params XH,XL,Y,WH,WL,H
-// 5. write data sequence (N bytes/packed_bits)
-// 6. write transfer=0 to reset
+// 5. write data sequence (bytes*plane /packed_bits)
+// (any new command to reset)
 //
-// 9b15: pal/ntsc (for PAL machine only)
+// 9b15: PAL/NTSC (for PAL machine only)
 // 0 = PAL
 // 1 = NTSC
 //
 // 9b18-9b37: 32 (re)SID registers (d400 on C64)
 
 // 9b38-9bff: lines background color (RGB332)
-// 9c00-9cc7: 7-4:  lines L1 xscroll hi, 3-0: L0 xscroll hi
-// 9cc8-9d8F: lines L0 xscroll lo
-// 9d90-9e58: lines L1 xscroll lo
+// 9c00-9cc7: 7-4:  lines L1 xscroll HI, 3-0: L0 xscroll HI
+// 9cc8-9d8F: lines L0 xscroll LO
+// 9d90-9e58: lines L1 xscroll LO
 //
-// 9f00-9f7f: Sprite collision (first 8 sprites)
-// 9f80-9fff: Sprite collision (last  8 sprites)
+// sprite collision only for first 16 sprites against all
+// 8bits x 128 entries
+// 9f00-9f7f: Sprite collision LO (first 8 sprites, bit0 = sprite 0)
+// 9f80-9fff: Sprite collision HI (last  8 sprites, bit0 = sprite 8)
 // 
 #define REG_TEXTMAP_L1    (0x8000 - 0x8000) // 32768
 #define REG_TILEMAP_L1    (0x8800 - 0x8000) // 34816

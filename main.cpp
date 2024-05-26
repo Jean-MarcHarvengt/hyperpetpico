@@ -68,8 +68,8 @@ extern "C" void hid_app_task(void);
 
 // Sprite definition
 #define SPRITEW        16             // Sprite width
-#define SPRITEH        24 //16        // Sprite height
-#define SPRITE_SIZE    (SPRITEW*SPRITEH)
+#define SPRITEH_MAX    24             // Sprite height max
+#define SPRITE_SIZE    (SPRITEW*SPRITEH_MAX)
 #define SPRITE_NUM     16             // Max Sprite NR on same row
 #define SPRITE_NUM_MAX 96             // Max reusable sprites NR 
 #define SPRITE_NBTILES 64             // Sprite NB of tiles definition
@@ -81,7 +81,7 @@ extern "C" void hid_app_task(void);
 
 #define TILE_NB_BANKS  2              // Number of banks (hack form bitmap unpack)
 // Tile data max size
-#define TILE_MAXDATA   (8*8*256*TILE_NB_BANKS)  // (or 16*16*64)
+#define TILE_MAXDATA   (8*8*256*TILE_NB_BANKS)  // (or 16*16*64*TILE_NB_BANKS)
 #define TILEMAP_SIZE   0x800
 
 // Font
@@ -108,11 +108,12 @@ static ALIGNED u8 Bitmap[LO_XRES*MAXHEIGHT];
 // Sprites
 struct Sprite {
    u8  y;
-   u8  id;
+   u8  h;
    u8  flipH;
    u8  flipV;
-   u32 x;
-};
+   u16 x;
+   u16 dataIndex;
+ };
 
 struct SprYSortedItem {
    u8 count;
@@ -123,6 +124,10 @@ static Sprite SpriteParams[SPRITE_NUM_MAX];
 static SprYSortedItem SpriteYSorted[256];
 static u8 SprYSortedIndexes[256];
 static u8 SprYSortedIds[SPRITE_NUM_MAX+1];
+static u8 SpriteDataW[SPRITE_NBTILES];
+static u8 SpriteDataH[SPRITE_NBTILES];
+static u16 SpriteIdToDataIndex[SPRITE_NBTILES];
+static u16 SpriteDataIndex=0;
 
 // Sprite definition
 static ALIGNED u8 SpriteData[SPRITE_SIZE*SPRITE_NBTILES];
@@ -336,8 +341,9 @@ void __not_in_flash("VideoRenderUpdate") VideoRenderUpdate(void)
             uint16_t x = (mem[REG_SPRITE_XHI+ind]<<8)+mem[REG_SPRITE_XLO+ind];    
             uint8_t y = mem[REG_SPRITE_Y+ind];
             SpriteParams[cur].x = x;
-            SpriteParams[cur].id = id & 0x3f;
+            SpriteParams[cur].dataIndex = SpriteIdToDataIndex[id & 0x3f];
             SpriteParams[cur].y = y;
+            SpriteParams[cur].h = SpriteDataH[id & 0x3f];
             SpriteParams[cur].flipH = (id & 0x40);
             SpriteParams[cur].flipV = (id & 0x80);
             cur++;       
@@ -358,17 +364,21 @@ void __not_in_flash("VideoRenderUpdate") VideoRenderUpdate(void)
     for (int i = 0; i < SPRITE_NUM_MAX; i++)
     {
       uint16_t x1 = (mem[REG_SPRITE_XHI+i]<<8)+mem[REG_SPRITE_XLO+i];    
-      uint8_t y1 = mem[REG_SPRITE_Y+i]; 
-      uint8_t colbits = 0;      
-      for (int k = 0; k < 8; k++)
-      {
-        uint16_t x = (mem[REG_SPRITE_XHI+k]<<8)+mem[REG_SPRITE_XLO+k];    
-        uint8_t y = mem[REG_SPRITE_Y+k];
-        if ( (x >= x1) && (x < (x1+SPRITEW)) && (y >= y1) && (y < (y1+SPRITEH)) )
+      uint8_t y1 = mem[REG_SPRITE_Y+i];
+      uint8_t id1 = mem[REG_SPRITE_IND+i]&0x3f; 
+      uint8_t colbits = 0;
+      if (id1) {
+        for (int k = 0; k < 8; k++)
         {
-          colbits += (1<<k);
-        }  
-      }
+          uint16_t x = (mem[REG_SPRITE_XHI+k]<<8)+mem[REG_SPRITE_XLO+k];    
+          uint8_t y  = mem[REG_SPRITE_Y+k];
+          uint8_t id = mem[REG_SPRITE_IND+k]&0x3f;
+          if ( (id) && (x >= x1) && (x < (x1+SpriteDataW[id1])) && (y >= y1) && (y < (y1+SpriteDataH[id1])) )
+          {
+            colbits += (1<<k);
+          }  
+        }
+      }     
       mem[REG_SPRITE_COL_LO+i] = colbits; 
     }
     sid_dump();
@@ -571,10 +581,11 @@ static void VideoRenderInit(void)
   for (int i = 0; i < SPRITE_NUM_MAX; i++)
   {
     SpriteParams[i].x = 0;
-    SpriteParams[i].id = 0;
+    SpriteParams[i].h = 0;
     SpriteParams[i].y = MAXHEIGHT;
     SpriteParams[i].flipH = 0;
     SpriteParams[i].flipV = 0;
+    SpriteParams[i].dataIndex = 0;
   }
 
   // Init tile map with something
@@ -675,9 +686,9 @@ int tra_h;
 static uint8_t cmd_param_ind;
 static uint8_t cmd_tra_depth;
 static uint8_t * tra_address;
-static int tra_x;
-static int tra_w;
-static int tra_stride;
+static uint16_t tra_x;
+static uint16_t tra_w;
+static uint16_t tra_stride;
 static uint8_t tra_spr_id;
 static uint8_t * tra_pal = &mem[REG_TLOOKUP];
 
@@ -888,28 +899,33 @@ uint8_t __not_in_flash("cmd_params_len") cmd_params_len[MAX_CMD]={
   0,3,3,6,4,4,2,2,2, 0,0,0, 0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1
 }; 
 
-static void __not_in_flash("traParamFuncDummy") traParamFuncDummy(void){
+static void __not_in_flash("traParamFuncDummy") traParamFuncDummy(void) {
 }
 
-static void __not_in_flash("traParamFuncTile") traParamFuncTile(void){
+static void __not_in_flash("traParamFuncTile") traParamFuncTile(void) {
   tra_spr_id = SPRITE_NBTILES; // not a sprite!
   tra_x = 0;
   tra_w = cmd_params[1];
   tra_h = cmd_params[2];
   tra_stride = tra_w;
-  tra_address = &TileData[tra_w*tra_stride*(cmd_params[0])];
+  tra_address = &TileData[tra_h*tra_stride*(cmd_params[0])];
 }
 
-static void __not_in_flash("traParamFuncSprite") traParamFuncSprite(void){
+static void __not_in_flash("traParamFuncSprite") traParamFuncSprite(void) {
   tra_spr_id = cmd_params[0] & (SPRITE_NBTILES-1);
+  if (!tra_spr_id) SpriteDataIndex = 0; 
   tra_x = 0;
-  tra_w = cmd_params[1];
+  tra_w = SPRITEW;
+  SpriteDataW[tra_spr_id]=cmd_params[1];  
   tra_h = cmd_params[2]; 
+  SpriteDataH[tra_spr_id]=tra_h;
   tra_stride = tra_w;
-  tra_address = &SpriteData[tra_w*tra_stride*tra_spr_id];
+  tra_address = &SpriteData[SpriteDataIndex];
+  SpriteIdToDataIndex[tra_spr_id] = SpriteDataIndex;
+  SpriteDataIndex += (tra_h*tra_stride);
 }
 
-static void __not_in_flash("traParamFuncBitmap") traParamFuncBitmap(void){
+static void __not_in_flash("traParamFuncBitmap") traParamFuncBitmap(void) {
   tra_stride = screen_width==HI_XRES?screen_width/2:screen_width;  
   tra_address = &Bitmap[tra_stride*cmd_params[2]+((cmd_params[0]<<8)+cmd_params[1])];
   tra_x = 0; 
@@ -917,7 +933,7 @@ static void __not_in_flash("traParamFuncBitmap") traParamFuncBitmap(void){
   tra_h = cmd_params[5];  
 }
 
-static void __not_in_flash("traParamFuncTmapcol") traParamFuncTmapcol(void){
+static void __not_in_flash("traParamFuncTmapcol") traParamFuncTmapcol(void) {
   tra_stride = screen_width/8;
   tra_address = &mem[REG_TILEMAP_L0-TILEMAP_SIZE*cmd_params[0]+tra_stride*cmd_params[2]+cmd_params[1]];
   tra_x = 0; 
@@ -925,7 +941,7 @@ static void __not_in_flash("traParamFuncTmapcol") traParamFuncTmapcol(void){
   tra_h = cmd_params[3];
 }
 
-static void __not_in_flash("traParamFuncTmaprow") traParamFuncTmaprow(void){
+static void __not_in_flash("traParamFuncTmaprow") traParamFuncTmaprow(void) {
   tra_stride = screen_width/8; 
   tra_address = &mem[REG_TILEMAP_L0-TILEMAP_SIZE*cmd_params[0]+tra_stride*cmd_params[2]+cmd_params[1]];
   tra_x = 0; 
@@ -933,21 +949,21 @@ static void __not_in_flash("traParamFuncTmaprow") traParamFuncTmaprow(void){
   tra_h = 1; 
 }
 
-static void __not_in_flash("traParamFuncPackedTiles") traParamFuncPackedTiles(void){
+static void __not_in_flash("traParamFuncPackedTiles") traParamFuncPackedTiles(void) {
   tra_h = (cmd_params[0]<<8)+cmd_params[1];
   tra_x = 0; //sizeof(TileData)-tra_h;
   tra_w = tra_h;
   tra_address = &Bitmap[0];
 }
 
-static void __not_in_flash("traParamFuncPackedSprites") traParamFuncPackedSprites(void){
+static void __not_in_flash("traParamFuncPackedSprites") traParamFuncPackedSprites(void) {
   tra_h = (cmd_params[0]<<8)+cmd_params[1];
   tra_x = 0; //sizeof(SpriteData)-tra_h;
   tra_w = tra_h;
   tra_address = &Bitmap[0];
 }
 
-static void __not_in_flash("traParamFuncPackedBitmap") traParamFuncPackedBitmap(void){
+static void __not_in_flash("traParamFuncPackedBitmap") traParamFuncPackedBitmap(void) {
   tra_h = (cmd_params[0]<<8)+cmd_params[1];
   tra_x = 0; //sizeof(Bitmap)-tra_h;
   tra_w = tra_h;
@@ -956,7 +972,7 @@ static void __not_in_flash("traParamFuncPackedBitmap") traParamFuncPackedBitmap(
 
 
 
-static void __not_in_flash("traParamFuncExecuteCommand") traParamFuncExecuteCommand(void){
+static void __not_in_flash("traParamFuncExecuteCommand") traParamFuncExecuteCommand(void) {
   mem[REG_TSTATUS] = 1; 
 /*
     case cmd_transfer_packed_tile_data:
@@ -974,7 +990,7 @@ static void __not_in_flash("traParamFuncExecuteCommand") traParamFuncExecuteComm
   } 
 }
 
-static void __not_in_flash("traParamFuncExecuteCommand1") traParamFuncExecuteCommand1(void){
+static void __not_in_flash("traParamFuncExecuteCommand1") traParamFuncExecuteCommand1(void) {
   mem[REG_TSTATUS] = 1; 
   if (cmd_queue_cnt != 256)
   {
