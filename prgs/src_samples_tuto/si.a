@@ -11,14 +11,16 @@
 bas_end !word $00
 
 ; Graphics
-; tile/text map
+; tiles/text map
 REG_TEXTMAP_L1    = $8000
 REG_TILEMAP_L1    = $8800
 REG_TILEMAP_L0    = $9000
 ; tile id 0-255 in 8x8   tile mode
 ; tile id 0-63  in 16x16 tile mode
 
-; sprite
+; sprites (96 max) in L2
+NB_SPRITES_MAX    = 96
+
 REG_SPRITE_IND    = $9800
 REG_SPRITE_XHI    = $9880
 REG_SPRITE_XLO    = $9900
@@ -145,9 +147,9 @@ REG_LINES_L0_XSCR = $9cc8
 REG_LINES_L1_XSCR = $9d90
 ;
 ; Sprite collision
-; only for first 16 sprites against all 
-; LO (8bits x 128 entries, first 8 sprites, bit0 = sprite 0) 
-; HI (8bits x 128 entries, last  8 sprites, bit0 = sprite 8)
+; only for first 16 sprites against all the rest (96) 
+; LO (8bits x 96 entries, first 8 sprites, bit0 = sprite 0) 
+; HI (8bits x 96 entries, last  8 sprites, bit0 = sprite 8)
 REG_SPRITE_COL_LO = $9f00 
 REG_SPRITE_COL_HI = $9f80
 ;
@@ -155,37 +157,42 @@ REG_SPRITE_COL_HI = $9f80
 ; SID (see C64)
 REG_SID_BASE      = $9f00
 
-; Aliens
-ANB_ROWS           = 5
-ANB_COLS           = 11
-ASTEP_X            = 16
-ASTEP_Y            = 16
-ABUMP_RIGHT       = (0)
-ABUMP_LEFT        = (256-ANB_COLS*ASTEP_X)
-ABUMP_TOP         = (32)
-ABUMP_DOWN        = (32+8*8)
 
-ALIENS_NB         = (ANB_ROWS*ANB_COLS)
+
+
+
+
+; Aliens
+ALIENS_NB_ROWS     = 5
+ALIENS_NB_COLS     = 11
+ALIENS_STEP_X      = 16
+ALIENS_STEP_Y      = 16
+ALIENS_BUMP_LEFT   = (0)
+ALIENS_BUMP_RIGHT  = (256-ALIENS_NB_COLS*ALIENS_STEP_X)
+ALIENS_BUMP_UP     = (32)
+ALIENS_BUMP_DOWN   = (32+8*8)
+
+ALIENS_NB         = (ALIENS_NB_ROWS*ALIENS_NB_COLS)
 ALIENS_FIRST_ID   = 5
 
+; Ship
 SHIP_X            = (256-16)/2 
 SHIP_Y            = (200-8) 
-SBUMP_RIGHT       = 0
-SBUMP_LEFT        = 255
+SHIP_BUMP_RIGHT   = 0
+SHIP_BUMP_LEFT    = 255
 SHIP_ID           = 4
 
+; Bullets
 BULLETS_FIRST_ID  = 0
 BULLETS_NB        = 4
 
+; Joystick macros
 JOY_LEFT          = $01
 JOY_RIGHT         = $02
 JOY_UP            = $04
 JOY_DOWN          = $08
 JOY_FIRE          = $10
 
-
-
-NB_SPRITES_TOTAL  = 96
 
 *= $0800
         lda REG_VIDEO_MODE
@@ -205,12 +212,14 @@ NB_SPRITES_TOTAL  = 96
 
         jsr program_sprites      ; transfer sprites definition to pico
 
-        lda #ABUMP_LEFT          ; Initialize aliens side bumps
+        lda #ALIENS_BUMP_LEFT          ; Initialize aliens side bumps
         sta abump_left
-        lda #ABUMP_RIGHT
+        lda #ALIENS_BUMP_RIGHT
         sta abump_right
-        lda #ABUMP_TOP
-        sta asproffy
+        lda #ALIENS_BUMP_DOWN
+        sta abump_down 
+        lda #ALIENS_BUMP_UP
+        sta asproffy               
         lda #1                   ; move to right first
         sta adir_is_right
         lda #ALIENS_NB           ; aliens hit count
@@ -231,13 +240,14 @@ clr:    sta $8000,x
         bne clr
 
 
-WAIT_SYNC:
-        lda REG_VSYNC            ; wait vsync
+WAIT_VSYNC: 
+        lda REG_VSYNC            ; wait till we left bottom border
         cmp #200
-        bne WAIT_SYNC
-SYNC2:  lda REG_VSYNC            ; wait vsync
+        beq WAIT_VSYNC
+WAIT_VSYNC2:
+        lda REG_VSYNC            ; wait till we reach bottom border
         cmp #200
-        beq SYNC2
+        bne WAIT_VSYNC2
 
         jsr handle_vsync         ; handle program on vsync  
 
@@ -268,13 +278,11 @@ w2:
         ora #JOY_FIRE
         sta joystick
 w3:
-
-        jmp WAIT_SYNC
+        jmp WAIT_VSYNC
 
         lda #0
         jsr $FFE4                ; Calling KERNAL GETIN 
-        beq WAIT_SYNC
-
+        beq WAIT_VSYNC
 
         jsr hide_sprites         ; hide all sprites
         pla                      ; restore mode and bgcolor
@@ -286,7 +294,7 @@ w3:
 ;-------------------------------------------------------------
 handle_vsync:
         lda asproffy
-        cmp #ABUMP_DOWN
+        cmp abump_down
         beq end_game_dead
         lda ahitcnt
         beq end_game_win
@@ -294,8 +302,19 @@ handle_vsync:
         jsr handle_ship
         jsr handle_bullets
 
-        ldx ahitcnt
+        ldx #<$8000              ; score
+        ldy #>$8000
+        lda ahitcnt        
         jsr tohex
+
+;        ldx #<$8000+32           ; debug info
+;        ldy #>$8000+32
+;        lda abump_right        
+;        jsr tohex
+;        ldx #<$8000+64
+;        ldy #>$8000+64
+;        lda abump_left        
+;        jsr tohex
 
         rts
 end_game_dead:        
@@ -352,10 +371,13 @@ hbul7:
 
 
         ldx #0                  ; test collision with ship bullet for all aliens
+        ldy #0
+        lda #$01                ; aliencol bit
+        sta msk+1
 hbul8:
         lda asprid,x            ; alien still there?
         beq hbul9
-        lda REG_SPRITE_COL_LO+ALIENS_FIRST_ID,x ; has colision with bulet
+        lda REG_SPRITE_COL_LO+ALIENS_FIRST_ID,x ; has colision with bullet
         and #1                  ; ship bullet = sprite 0, bit0
         beq hbul9
         lda #0                  ; alien and bullet off
@@ -363,13 +385,87 @@ hbul8:
         sta asprid,x
         dec ahitcnt             ; decrement hit counter
 
-        ; here we should check if a full column of alien is gone at extremes
+        ; here we check if a full column of alien is gone at extreme sides
         ; then we ajust the bump left and right
         
+        lda acolsbits,y
+msk:    eor #$01
+        sta acolsbits,y
+
 hbul9:        
+        iny                      ; next column
+        cpy #ALIENS_NB_COLS
+        bne hbul10
+        ldy #0                   ; wrap around
+        lda msk+1                ; next row
+        asl
+        sta msk+1 
+hbul10:        
         inx
         cpx #ALIENS_NB
         bne hbul8
+
+
+        ldx #0                   ; adjust left bump if a row of aliens empty at left 
+        ldy #ALIENS_BUMP_LEFT
+hbul11:
+        lda acolsbits,x
+        bne hbul12
+        tya
+        sec
+        sbc #ALIENS_STEP_X
+        tay
+        inx 
+        cpx #ALIENS_NB_COLS
+        bne hbul11
+hbul12:
+        tya
+        sta abump_left
+
+
+        ldx #ALIENS_NB_COLS-1    ; adjust left bump if a row of aliens empty at right 
+        ldy #ALIENS_BUMP_RIGHT
+hbul13:
+        lda acolsbits,x
+        bne hbul14
+        tya
+        clc
+        adc #ALIENS_STEP_X
+        tay
+        dex 
+        bpl hbul13
+hbul14:
+        tya
+        sta abump_right
+
+
+        lda #ALIENS_BUMP_DOWN    ; adjust bump down if a row of aliens empty at right
+        sta abump_down 
+        ldx #ALIENS_NB-1         ; start at bottom
+        ldy #ALIENS_NB_COLS
+        lda #0                   ; counter of dead aliens per row
+        sta zeros+1
+hbul15:
+        lda asprid,x
+        bne hbul16
+        inc zeros+1
+hbul16:
+        dey
+        bne hbul18
+        ldy #ALIENS_NB_COLS      ; end of a row
+zeros:  lda #0                   ; dead aliens = ALIENS_NB_COLS?
+        cmp #ALIENS_NB_COLS
+        bne hbul17
+        lda abump_down           ; yes, bump is one row less
+        clc
+        adc #ALIENS_STEP_Y
+        sta abump_down
+hbul17:
+        lda #0                   ; reset dead aliens per row counter
+        sta zeros+1
+hbul18:
+        dex
+        bpl hbul15
 
         rts
 
@@ -387,7 +483,7 @@ handle_ship:
         and #JOY_LEFT
         beq hship1
         lda ssproffx
-        cmp #SBUMP_RIGHT
+        cmp #SHIP_BUMP_RIGHT
         beq hship2
         dec ssproffx
         jmp hship2
@@ -397,7 +493,7 @@ hship1:
         and #JOY_RIGHT
         beq hship2
         lda ssproffx
-        cmp #SBUMP_LEFT
+        cmp #SHIP_BUMP_LEFT
         beq hship_end
         inc ssproffx
 hship2:
@@ -427,7 +523,7 @@ handle_aliens:
         rts 
 
 hali0:
-        lda ahitcnt
+        lda ahitcnt              ; speed up depending on hit count
         lsr
         lsr
         lsr        
@@ -439,44 +535,42 @@ hali0:
         sta bumpr+1
         lda abump_left
         sta bumpl+1
-
         lda asproffy
         sta offy+1
-        
         lda adir_is_right
         bne hali1
 
         dec asproffx
         lda asproffx
-bumpr:  cmp #$00
+bumpl:  cmp #$00
         bne hali3
         inc asproffx
         jmp hali2
-
 hali1:
         inc asproffx
         lda asproffx
-bumpl:  cmp #$00
+bumpr:  cmp #$00
         bne hali3
         dec asproffx
 hali2:
         lda adir_is_right
         eor #1
         sta adir_is_right
+        inc asproffy             ; 4 pixels down
         inc asproffy
         inc asproffy
-
+        inc asproffy
 hali3:
         lda asproffx
         sta offx+1
         ldx #0
 hali4:        
-        lda asproffx
+        lda asproffx             ; toggle alien sprite at bit3 rate of x position 
         and #$8
         beq hali5
-        clc
         lda asprid,x
         beq hali6
+        clc
         adc #1
         jmp hali6
 hali5:
@@ -484,9 +578,11 @@ hali5:
 hali6:
         sta REG_SPRITE_IND+ALIENS_FIRST_ID,x
         lda asprx,x
+        clc
 offx:   adc #$00        
         sta REG_SPRITE_XLO+ALIENS_FIRST_ID,x
         lda aspry,x
+        clc
 offy:   adc #$00
         sta REG_SPRITE_Y+ALIENS_FIRST_ID,x
         clc
@@ -609,7 +705,7 @@ hspr1:
         lda #200
         sta REG_SPRITE_Y,y
         iny
-        cpy #NB_SPRITES_TOTAL
+        cpy #NB_SPRITES_MAX
         bne hspr1
         rts
 
@@ -637,36 +733,43 @@ sprite11:
 
 ;-------------------------------------------------------------
 tohex:
-        txa
+        stx hexd0+1 
+        inx
+        stx hexd1+1 
+        sty hexd0+2
+        sty hexd1+2
+        tax
         lsr
         lsr
         lsr
         lsr
         tay
         lda hex,y
-        sta $8000
+hexd0:  sta $8000
         txa
         and #$f
         tay
         lda hex,y
-        sta $8001
+hexd1:  sta $8001
 
         rts
 
 ;-------------------------------------------------------------
+; Aliens data
+
 asprx:
-!byte 0*ASTEP_X,1*ASTEP_X,2*ASTEP_X,3*ASTEP_X,4*ASTEP_X,5*ASTEP_X,6*ASTEP_X,7*ASTEP_X,8*ASTEP_X,9*ASTEP_X,10*ASTEP_X
-!byte 0*ASTEP_X,1*ASTEP_X,2*ASTEP_X,3*ASTEP_X,4*ASTEP_X,5*ASTEP_X,6*ASTEP_X,7*ASTEP_X,8*ASTEP_X,9*ASTEP_X,10*ASTEP_X
-!byte 0*ASTEP_X,1*ASTEP_X,2*ASTEP_X,3*ASTEP_X,4*ASTEP_X,5*ASTEP_X,6*ASTEP_X,7*ASTEP_X,8*ASTEP_X,9*ASTEP_X,10*ASTEP_X
-!byte 0*ASTEP_X,1*ASTEP_X,2*ASTEP_X,3*ASTEP_X,4*ASTEP_X,5*ASTEP_X,6*ASTEP_X,7*ASTEP_X,8*ASTEP_X,9*ASTEP_X,10*ASTEP_X
-!byte 0*ASTEP_X,1*ASTEP_X,2*ASTEP_X,3*ASTEP_X,4*ASTEP_X,5*ASTEP_X,6*ASTEP_X,7*ASTEP_X,8*ASTEP_X,9*ASTEP_X,10*ASTEP_X
+!byte 0*ALIENS_STEP_X,1*ALIENS_STEP_X,2*ALIENS_STEP_X,3*ALIENS_STEP_X,4*ALIENS_STEP_X,5*ALIENS_STEP_X,6*ALIENS_STEP_X,7*ALIENS_STEP_X,8*ALIENS_STEP_X,9*ALIENS_STEP_X,10*ALIENS_STEP_X
+!byte 0*ALIENS_STEP_X,1*ALIENS_STEP_X,2*ALIENS_STEP_X,3*ALIENS_STEP_X,4*ALIENS_STEP_X,5*ALIENS_STEP_X,6*ALIENS_STEP_X,7*ALIENS_STEP_X,8*ALIENS_STEP_X,9*ALIENS_STEP_X,10*ALIENS_STEP_X
+!byte 0*ALIENS_STEP_X,1*ALIENS_STEP_X,2*ALIENS_STEP_X,3*ALIENS_STEP_X,4*ALIENS_STEP_X,5*ALIENS_STEP_X,6*ALIENS_STEP_X,7*ALIENS_STEP_X,8*ALIENS_STEP_X,9*ALIENS_STEP_X,10*ALIENS_STEP_X
+!byte 0*ALIENS_STEP_X,1*ALIENS_STEP_X,2*ALIENS_STEP_X,3*ALIENS_STEP_X,4*ALIENS_STEP_X,5*ALIENS_STEP_X,6*ALIENS_STEP_X,7*ALIENS_STEP_X,8*ALIENS_STEP_X,9*ALIENS_STEP_X,10*ALIENS_STEP_X
+!byte 0*ALIENS_STEP_X,1*ALIENS_STEP_X,2*ALIENS_STEP_X,3*ALIENS_STEP_X,4*ALIENS_STEP_X,5*ALIENS_STEP_X,6*ALIENS_STEP_X,7*ALIENS_STEP_X,8*ALIENS_STEP_X,9*ALIENS_STEP_X,10*ALIENS_STEP_X
 
 aspry:
-!byte 0*ASTEP_Y,0*ASTEP_Y,0*ASTEP_Y,0*ASTEP_Y,0*ASTEP_Y,0*ASTEP_Y,0*ASTEP_Y,0*ASTEP_Y,0*ASTEP_Y,0*ASTEP_Y,0*ASTEP_Y
-!byte 1*ASTEP_Y,1*ASTEP_Y,1*ASTEP_Y,1*ASTEP_Y,1*ASTEP_Y,1*ASTEP_Y,1*ASTEP_Y,1*ASTEP_Y,1*ASTEP_Y,1*ASTEP_Y,1*ASTEP_Y
-!byte 2*ASTEP_Y,2*ASTEP_Y,2*ASTEP_Y,2*ASTEP_Y,2*ASTEP_Y,2*ASTEP_Y,2*ASTEP_Y,2*ASTEP_Y,2*ASTEP_Y,2*ASTEP_Y,2*ASTEP_Y
-!byte 3*ASTEP_Y,3*ASTEP_Y,3*ASTEP_Y,3*ASTEP_Y,3*ASTEP_Y,3*ASTEP_Y,3*ASTEP_Y,3*ASTEP_Y,3*ASTEP_Y,3*ASTEP_Y,3*ASTEP_Y
-!byte 4*ASTEP_Y,4*ASTEP_Y,4*ASTEP_Y,4*ASTEP_Y,4*ASTEP_Y,4*ASTEP_Y,4*ASTEP_Y,4*ASTEP_Y,4*ASTEP_Y,4*ASTEP_Y,4*ASTEP_Y
+!byte 0*ALIENS_STEP_Y,0*ALIENS_STEP_Y,0*ALIENS_STEP_Y,0*ALIENS_STEP_Y,0*ALIENS_STEP_Y,0*ALIENS_STEP_Y,0*ALIENS_STEP_Y,0*ALIENS_STEP_Y,0*ALIENS_STEP_Y,0*ALIENS_STEP_Y,0*ALIENS_STEP_Y
+!byte 1*ALIENS_STEP_Y,1*ALIENS_STEP_Y,1*ALIENS_STEP_Y,1*ALIENS_STEP_Y,1*ALIENS_STEP_Y,1*ALIENS_STEP_Y,1*ALIENS_STEP_Y,1*ALIENS_STEP_Y,1*ALIENS_STEP_Y,1*ALIENS_STEP_Y,1*ALIENS_STEP_Y
+!byte 2*ALIENS_STEP_Y,2*ALIENS_STEP_Y,2*ALIENS_STEP_Y,2*ALIENS_STEP_Y,2*ALIENS_STEP_Y,2*ALIENS_STEP_Y,2*ALIENS_STEP_Y,2*ALIENS_STEP_Y,2*ALIENS_STEP_Y,2*ALIENS_STEP_Y,2*ALIENS_STEP_Y
+!byte 3*ALIENS_STEP_Y,3*ALIENS_STEP_Y,3*ALIENS_STEP_Y,3*ALIENS_STEP_Y,3*ALIENS_STEP_Y,3*ALIENS_STEP_Y,3*ALIENS_STEP_Y,3*ALIENS_STEP_Y,3*ALIENS_STEP_Y,3*ALIENS_STEP_Y,3*ALIENS_STEP_Y
+!byte 4*ALIENS_STEP_Y,4*ALIENS_STEP_Y,4*ALIENS_STEP_Y,4*ALIENS_STEP_Y,4*ALIENS_STEP_Y,4*ALIENS_STEP_Y,4*ALIENS_STEP_Y,4*ALIENS_STEP_Y,4*ALIENS_STEP_Y,4*ALIENS_STEP_Y,4*ALIENS_STEP_Y
 
 asprid:
 !byte 2,2,2,2,2,2,2,2,2,2,2
@@ -675,6 +778,47 @@ asprid:
 !byte 6,6,6,6,6,6,6,6,6,6,6
 !byte 6,6,6,6,6,6,6,6,6,6,6
 
+acolsbits:
+!byte $1f,$1f,$1f,$1f,$1f,$1f,$1f,$1f,$1f,$1f,$1f
+
+asproffx:
+!byte 0
+
+asproffy:
+!byte 40
+
+abump_left:
+!byte 0
+
+abump_right:
+!byte 0
+
+abump_down:
+!byte 0
+
+adir_is_right:
+!byte 1
+
+ahitcnt:
+!byte 0
+
+aspeedcnt:
+!byte 0
+
+ahitcnt2speedcnt
+!byte 1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8
+
+;-------------------------------------------------------------
+; Ship data
+
+ssproffx:
+!byte 0
+
+joystick:
+!byte 0
+
+;-------------------------------------------------------------
+; Bullets data
 
 bsprx:
 !byte 0,0,0,0,0
@@ -686,36 +830,16 @@ bsprid:
 !byte 0,0,0,0,0
 
 
-asproffx:
-!byte 0
-asproffy:
-!byte 40
-abump_left:
-!byte 0
-abump_right:
-!byte 0
-adir_is_right:
-!byte 1
-ahitcnt:
-!byte 0
-aspeedcnt:
-!byte 0
-ahitcnt2speedcnt
-!byte 1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8
-
-
-ssproffx:
-!byte 0
-
-joystick:
-!byte 0
-
 ;-------------------------------------------------------------
+; Debug data
+
 hex:
 !byte $30,$31,$32,$33,$34,$35,$36,$37,$38,$39
 !byte $01,$02,$03,$04,$05,$06
 
 ;-------------------------------------------------------------
+; Sprites definition
+
 sprite_empty:
 !byte %00000000,%00000000
 !byte %00000000,%00000000

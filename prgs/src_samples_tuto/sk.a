@@ -13,14 +13,16 @@ bas_end !word $00
 
 
 ; Graphics
-; tile/text map
+; tiles/text map
 REG_TEXTMAP_L1    = $8000
 REG_TILEMAP_L1    = $8800
 REG_TILEMAP_L0    = $9000
 ; tile id 0-255 in 8x8   tile mode
 ; tile id 0-63  in 16x16 tile mode
 
-; sprite
+; sprites (96 max) in L2
+NB_SPRITES_MAX    = 96
+
 REG_SPRITE_IND    = $9800
 REG_SPRITE_XHI    = $9880
 REG_SPRITE_XLO    = $9900
@@ -147,9 +149,9 @@ REG_LINES_L0_XSCR = $9cc8
 REG_LINES_L1_XSCR = $9d90
 ;
 ; Sprite collision
-; only for first 16 sprites against all 
-; LO (8bits x 128 entries, first 8 sprites, bit0 = sprite 0) 
-; HI (8bits x 128 entries, last  8 sprites, bit0 = sprite 8)
+; only for first 16 sprites against all the rest (96) 
+; LO (8bits x 96 entries, first 8 sprites, bit0 = sprite 0) 
+; HI (8bits x 96 entries, last  8 sprites, bit0 = sprite 8)
 REG_SPRITE_COL_LO = $9f00 
 REG_SPRITE_COL_HI = $9f80
 ;
