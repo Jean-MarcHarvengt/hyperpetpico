@@ -12,6 +12,8 @@ Have a look at the YouTube videos:<br>
 [HyperPET pico Development Tutorial (Part2: sprites graphical objects)](https://youtu.be/8ZjlqQmJXdo?si=lpqTXvzPPhYjKBgU)<br>
 
 <br>
+Initially the purpose of the project was to offer VGA output to the PET. At this point of time, the HyperPET pico project supports:
+<br>
 
 * VGA output up to 640x200 (80 colums)
 * extended graphical modes including (640/320/256)x200 resolutions in 256 colors.
