@@ -178,8 +178,8 @@ ALIENS_FIRST_ID   = 5
 ; Ship
 SHIP_X            = (256-16)/2 
 SHIP_Y            = (200-8) 
-SHIP_BUMP_RIGHT   = 0
-SHIP_BUMP_LEFT    = 255
+SHIP_BUMP_LEFT    = 0
+SHIP_BUMP_RIGHT   = 255
 SHIP_ID           = 4
 
 ; Bullets
@@ -483,7 +483,7 @@ handle_ship:
         and #JOY_LEFT
         beq hship1
         lda ssproffx
-        cmp #SHIP_BUMP_RIGHT
+        cmp #SHIP_BUMP_LEFT
         beq hship2
         dec ssproffx
         jmp hship2
@@ -493,7 +493,7 @@ hship1:
         and #JOY_RIGHT
         beq hship2
         lda ssproffx
-        cmp #SHIP_BUMP_LEFT
+        cmp #SHIP_BUMP_RIGHT
         beq hship_end
         inc ssproffx
 hship2:

@@ -162,6 +162,7 @@ REG_SID_BASE      = $9f00
 
 *= $0800
 
+
 WAIT_KEY
         jsr $FFE4        ; Calling KERNAL GETIN 
         beq WAIT_KEY
