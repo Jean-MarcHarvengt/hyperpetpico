@@ -39,7 +39,7 @@ The HyperPET pico exists in 2 boards<br>
 
 The picture on the PET monitor is mirrored to VGA by default (80/40 columns modes)<br>
 Programs can be loaded (via tape emulation, or modern devices as PETdisk or PETdisk MAX 2 or the resident File Browser)<br>
-As soon a program make uses of extended graphics capabilities, only VGA will show it/them<br>
+As soon a program make uses of extended graphics capabilities, only VGA output will show it/them<br>
 The rest of the PET hardware is just used normally (CPU, RAM, ROM, keyboard, PIA, VIA ...)<br>
 New registers are available through the memory region $9000-$9FFF (R/W)<br>
 The region $A000-$AFFF is available as extra RAM (R/W) or to store custom ROMs (the File Browser being the default).
@@ -50,7 +50,7 @@ At any moment, the resident File Browser can be invoked using the command sys409
 
 To ease development, the plugin module can be used as a standalone PET system<br>
 * the CPU, RAM (32K), ROM, PIA, VIA are emulated
-* a OTG USB keyboard can be used to interract
+* a USB keyboard can be used to interract (OTG adapter)
 * all new GFX/sound features can be used for development 
 * developed programs can be injected over WiFI for testing (via TFTP server)
 
