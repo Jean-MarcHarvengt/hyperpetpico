@@ -109,18 +109,19 @@ To ease development, the plugin module can be used as a standalone PET system<br
   * pico : cmake .. 
   * make
 
-## Connect over WiFi (picow standalone)
+## Connect over WiFi to the HyperPET pico standalone module (with picow)
 * accesspoint :	hyperpetpico
 * passwd      :   picopet123
 * IP address  :	192.168.123.1
 * tftp 192.168.123.1
   * binary
   * put "myprogram.prg"       => will run the program immediately
-  * put "myprogram.prg" reset => it will reset the PET emulation
+  * put "myprogram.prg" reset => will reset the PET emulation
+  * put "myprogram.prg" key   => will simulate a key press
 
 ## Hardware modification
-* this is required to allow the CPU to read the PICO memory range $9000-$FFFF and not only $9000-$9fff 
-* as such, emulate ROMs in $A000 and above
+* this is required to allow the CPU to read the memory range $9000-$FFFF on the bus expansion and not only $9000-$9fff 
+* as such, emulate ROMs in $A000 and above (if not in socket)
 <p align="left"> 
 <img src="/images/mod.png" width="320" height="240" />  
 </p>
