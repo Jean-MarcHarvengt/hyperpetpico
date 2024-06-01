@@ -56,7 +56,7 @@ To ease development, the plugin module can be used as a standalone PET system<br
 
 ## Initial prototypes
 <p align="left">
-<img src="/images/proto1_1.jpg" width="240" height="260"  />  
+<img src="/images/proto1_1.jpg" width="320" height="260"  />  
 <img src="/images/proto1_2.jpg" width="240" height="260" />  
 <img src="/images/proto2.png" width="240" height="260" />  
 </p>
