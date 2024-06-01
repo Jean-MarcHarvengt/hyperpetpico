@@ -33,7 +33,7 @@ At this point of time, the HyperPET pico project supports:
 
 The HyperPET pico exists in 2 boards<br>
 * The inner board (residing inside the PET) multiplexing the memory expansion connectors to the outside
-* The outer board, as a plugin module, offering all the new features (with VGA/audio output)
+* The outer board (HyperPET pico module), as a plugin module, offering all the new features (with VGA/audio output)
 
 <br>
 
