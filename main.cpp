@@ -157,6 +157,16 @@ static int file_block_wr_pt=0;
 static char files[MAX_FILES][MAX_FILENAME_SIZE];
 static char scratchpad[256]={0};
 
+// filesystem
+static u8 joystick0 = 0xff;
+static bool kbdasjoy = false;
+// Joystick macros
+#define JOY_UP      (1)
+#define JOY_DOWN    (2)
+#define JOY_LEFT    (4)
+#define JOY_RIGHT   (8) 
+#define JOY_FIRE    (1+2)
+
 // ****************************************
 // Audio code
 // ****************************************
@@ -654,6 +664,8 @@ static void SystemReset(void)
 {  
   VideoRenderInit();
   pwm_audio_reset();
+  joystick0 = 0xff;
+  kbdasjoy = false;
 }
 
 #ifdef HAS_PETIO
@@ -734,14 +746,12 @@ static void handleCmdQueue(void) {
       case cmd_openfile:
         nbread = 0;
         if (fatfs_mounted) {
-          file_block_wr_pt = 1;
           strcat(scratchpad, "/");
           strcat(scratchpad, &files[cmd.p8_1][0]);
           if( !(f_open(&file, scratchpad , FA_READ)) ) {
-            f_read (&file, (void*)&mem[REG_TLOOKUP+file_block_wr_pt], 255, &nbread);
+            f_read (&file, (void*)&mem[REG_TLOOKUP+1], 255, &nbread);
             if (!nbread) f_close(&file);
           }
-          file_block_wr_pt += nbread; 
         }
         mem[REG_TLOOKUP] = nbread;
         break;        
@@ -749,9 +759,8 @@ static void handleCmdQueue(void) {
         nbread = 0; 
         if (fatfs_mounted) {
           file_block_wr_pt = 1;
-          f_read (&file, (void*)&mem[REG_TLOOKUP+file_block_wr_pt], 255, &nbread);
+          f_read (&file, (void*)&mem[REG_TLOOKUP+1], 255, &nbread);
           if (!nbread) f_close(&file);
-          file_block_wr_pt += nbread; 
         }
         mem[REG_TLOOKUP] = nbread;
         break;        
@@ -1014,11 +1023,11 @@ void __not_in_flash("traParamFuncPtr") (*traParamFuncPtr[MAX_CMD])(void) = {
   traParamFuncDummy,
   traParamFuncDummy,
   traParamFuncDummy,
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
   
-  traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand,
   traParamFuncExecuteCommand,
   traParamFuncExecuteCommand,
   traParamFuncExecuteCommand,
@@ -1294,6 +1303,8 @@ uint8_t readWord( uint16_t location)
       return (_rows[_row] ^ 0xff);    
     else if (location == 0xe810)    // PORT A
       return (_row | 0x80); 
+    else if (location == 0xe84f)    // PORT Joystick
+      return (joystick0); 
     else
       return 0x00;
   }  
@@ -1430,63 +1441,94 @@ static void pet_kup(uint8_t asciicode) {
 //static const unsigned char digits[16] = {0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x41,0x42,0x43,0x44,0x45,0x46} ;
 static int prev_code=0;
 
+void signal_joy (int code, int pressed) {
+  if ( (code == KBD_KEY_DOWN) && (pressed) ) joystick0 &= ~JOY_DOWN;
+  if ( (code == KBD_KEY_DOWN) && (!pressed) ) joystick0 |= JOY_DOWN;
+  if ( (code == KBD_KEY_UP) && (pressed) ) joystick0 &= ~JOY_UP;
+  if ( (code == KBD_KEY_UP) && (!pressed) ) joystick0 |= JOY_UP;
+  if ( (code == KBD_KEY_LEFT) && (pressed) ) joystick0 &= ~JOY_LEFT;
+  if ( (code == KBD_KEY_LEFT) && (!pressed) ) joystick0 |= JOY_LEFT;
+  if ( (code == KBD_KEY_RIGHT) && (pressed) ) joystick0 &= ~JOY_RIGHT;
+  if ( (code == KBD_KEY_RIGHT) && (!pressed) ) joystick0 |= JOY_RIGHT;
+  if ( (code == ' ') && (pressed) ) joystick0 &= ~JOY_FIRE;
+  if ( (code == ' ') && (!pressed) ) joystick0 |= JOY_FIRE;
+}
+
 void kbd_signal_raw_key (int keycode, int code, int codeshifted, int flags, int pressed) {
   //mem[0] = digits[(keycode>>12)&0xf];
   //mem[1] = digits[(keycode>>8)&0xf];
   //mem[2] = digits[(keycode>>4)&0xf];
   //mem[3] = digits[keycode&0xf]; 
-  if (!(flags & (KBD_FLAG_RSHIFT + KBD_FLAG_RCONTROL))) {
-    if (codeshifted == '&') {code = '6'; flags |= KBD_FLAG_RSHIFT; }
-    else if (codeshifted == '\"') {code = '2'; flags |= KBD_FLAG_RSHIFT; }
-    else if (codeshifted == '\'') {code = '7'; flags |= KBD_FLAG_RSHIFT; }
-    else if (codeshifted == '(') {code = '8'; flags |= KBD_FLAG_RSHIFT; }
-    else if (codeshifted == '!') {code = '1'; flags |= KBD_FLAG_RSHIFT; }
-    else if (codeshifted == '*') {code = ':'; flags |= KBD_FLAG_RSHIFT; }
-    else if (codeshifted == '%') {code = '5'; flags |= KBD_FLAG_RSHIFT; }
-    else if (codeshifted == '?') {code = '/'; flags |= KBD_FLAG_RSHIFT; }
-    else if (codeshifted == '.') {code = '.'; flags |= 0; }
-    else if (codeshifted == '+') {code = ';'; flags |= KBD_FLAG_RSHIFT; }
-    else if (codeshifted == '>') {code = '.'; flags |= KBD_FLAG_RSHIFT; }
-    else if (codeshifted == ')') {code = '9'; flags |= KBD_FLAG_RSHIFT; }
-    else if (codeshifted == '$') {code = '4'; flags |= KBD_FLAG_RSHIFT; }
-    else if (codeshifted == '=') {code = '-'; flags |= KBD_FLAG_RSHIFT; }
-    else if (codeshifted == '<') {code = ','; flags |= KBD_FLAG_RSHIFT; }
-    else if (codeshifted == KBD_KEY_DOWN) {code = 0x11; flags |= 0; }
-    else if (codeshifted == KBD_KEY_RIGHT) {code = 0x1D; flags |= 0; }
-    else if (codeshifted == KBD_KEY_UP) {code = 0x11; flags |= KBD_FLAG_RSHIFT; }
-    else if (codeshifted == KBD_KEY_LEFT) {code = 0x1D; flags |= KBD_FLAG_RSHIFT; }
-    else if (codeshifted == KBD_KEY_ESC) {code = 0x9B; flags |= 0; }
-    // no PET chars for below characters!!!
-    else if (codeshifted == '@') {code = 0; flags |= 0; }
-    else if (codeshifted == '[') {code = 0; flags |= 0; }
-    else if (codeshifted == ']') {code = 0; flags |= 0; }
-    else if (codeshifted == '^') {code = 0; flags |= 0; }
-    else if (codeshifted == '{') {code = 0; flags |= 0; }
-    else if (codeshifted == '}') {code = 0; flags |= 0; }
-    else if (codeshifted == '_') {code = 0; flags |= 0; }
-    else if ( (codeshifted >= 'a') && (codeshifted <= 'z') ) { code = toupper(code); }
-    else if ( (codeshifted >= 'A') && (codeshifted <= 'Z') ) { code = codeshifted; flags |= KBD_FLAG_RSHIFT; }
-    else code = codeshifted;
+
+  // LCTRL + LSHIFT + J => keyboard as joystick
+  if ( ( (flags & (KBD_FLAG_LSHIFT + KBD_FLAG_LCONTROL)) == (KBD_FLAG_LSHIFT + KBD_FLAG_LCONTROL) ) && (!pressed) && (code == 'j') ) {
+    if (kbdasjoy == true) kbdasjoy = false; 
+    else kbdasjoy = true;
+  }
+
+  //keyboard as joystick?
+  if (kbdasjoy == true) {
+      if (prev_code) signal_joy(prev_code, 0);
+      if (code) {
+        signal_joy(code, pressed);
+        if (pressed) prev_code = code;
+      }  
+      //mem[REG_TEXTMAP_L1] = joystick0;
   }
   else {
-    code = toupper(code);
+    if (!(flags & (KBD_FLAG_RSHIFT + KBD_FLAG_RCONTROL))) {
+      if (codeshifted == '&') {code = '6'; flags |= KBD_FLAG_RSHIFT; }
+      else if (codeshifted == '\"') {code = '2'; flags |= KBD_FLAG_RSHIFT; }
+      else if (codeshifted == '\'') {code = '7'; flags |= KBD_FLAG_RSHIFT; }
+      else if (codeshifted == '(') {code = '8'; flags |= KBD_FLAG_RSHIFT; }
+      else if (codeshifted == '!') {code = '1'; flags |= KBD_FLAG_RSHIFT; }
+      else if (codeshifted == '*') {code = ':'; flags |= KBD_FLAG_RSHIFT; }
+      else if (codeshifted == '%') {code = '5'; flags |= KBD_FLAG_RSHIFT; }
+      else if (codeshifted == '?') {code = '/'; flags |= KBD_FLAG_RSHIFT; }
+      else if (codeshifted == '.') {code = '.'; flags |= 0; }
+      else if (codeshifted == '+') {code = ';'; flags |= KBD_FLAG_RSHIFT; }
+      else if (codeshifted == '>') {code = '.'; flags |= KBD_FLAG_RSHIFT; }
+      else if (codeshifted == ')') {code = '9'; flags |= KBD_FLAG_RSHIFT; }
+      else if (codeshifted == '$') {code = '4'; flags |= KBD_FLAG_RSHIFT; }
+      else if (codeshifted == '=') {code = '-'; flags |= KBD_FLAG_RSHIFT; }
+      else if (codeshifted == '<') {code = ','; flags |= KBD_FLAG_RSHIFT; }
+      else if (codeshifted == KBD_KEY_DOWN) {code = 0x11; flags |= 0; }
+      else if (codeshifted == KBD_KEY_RIGHT) {code = 0x1D; flags |= 0; }
+      else if (codeshifted == KBD_KEY_UP) {code = 0x11; flags |= KBD_FLAG_RSHIFT; }
+      else if (codeshifted == KBD_KEY_LEFT) {code = 0x1D; flags |= KBD_FLAG_RSHIFT; }
+      else if (codeshifted == KBD_KEY_ESC) {code = 0x9B; flags |= 0; }
+      // no PET chars for below characters!!!
+      else if (codeshifted == '@') {code = 0; flags |= 0; }
+      else if (codeshifted == '[') {code = 0; flags |= 0; }
+      else if (codeshifted == ']') {code = 0; flags |= 0; }
+      else if (codeshifted == '^') {code = 0; flags |= 0; }
+      else if (codeshifted == '{') {code = 0; flags |= 0; }
+      else if (codeshifted == '}') {code = 0; flags |= 0; }
+      else if (codeshifted == '_') {code = 0; flags |= 0; }
+      else if ( (codeshifted >= 'a') && (codeshifted <= 'z') ) { code = toupper(code); }
+      else if ( (codeshifted >= 'A') && (codeshifted <= 'Z') ) { code = codeshifted; flags |= KBD_FLAG_RSHIFT; }
+      else code = codeshifted;
+    }
+    else {
+      code = toupper(code);
+    }  
+
+    if (prev_code) pet_kup(prev_code);
+
+    if (code) {
+      if (pressed == KEY_PRESSED)
+      {
+        pet_kdown(code, flags & KBD_FLAG_RSHIFT, flags & KBD_FLAG_RCONTROL);
+        prev_code = code;
+        //printf("kdown %c\r\n", kbd_to_ascii (code, flags));
+      }
+      else 
+      {
+        pet_kup(code);
+        //printf("kup %c\r\n", kbd_to_ascii (code, flags));
+      }
+    }    
   }  
-
-  if (prev_code) pet_kup(prev_code);
-
-  if (code) {
-    if (pressed == KEY_PRESSED)
-    {
-      pet_kdown(code, flags & KBD_FLAG_RSHIFT, flags & KBD_FLAG_RCONTROL);
-      prev_code = code;
-      //printf("kdown %c\r\n", kbd_to_ascii (code, flags));
-    }
-    else 
-    {
-      pet_kup(code);
-      //printf("kup %c\r\n", kbd_to_ascii (code, flags));
-    }
-  }
 }
 #endif
 #endif

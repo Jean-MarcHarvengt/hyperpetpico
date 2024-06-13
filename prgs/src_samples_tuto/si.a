@@ -205,14 +205,18 @@ JOY_FIRE          = $10
         lda #$00                 ; background color to black
         sta REG_BG_COL
 
-        lda #4+2+1               ; show sprite layer (L2), L1 and L0
+        lda #4+2+1+32            ; show sprite layer (L2), L1 and L0
         sta REG_LAYERS_CFG
 
         jsr hide_sprites         ; hide all sprites
 
         jsr program_sprites      ; transfer sprites definition to pico
 
-        lda #ALIENS_BUMP_LEFT          ; Initialize aliens side bumps
+        jsr program_tiles        ; transfer sprites definition to pico
+        
+
+
+        lda #ALIENS_BUMP_LEFT    ; Initialize aliens side bumps
         sta abump_left
         lda #ALIENS_BUMP_RIGHT
         sta abump_right
@@ -231,14 +235,15 @@ JOY_FIRE          = $10
         sta ssproffx
 
         ldx #0                   ; clear screen tiles
-        lda #$20
-clr:    sta $8000,x
-        sta $8100,x
-        sta $8200,x
-        sta $8300,x
+        lda #$00
+clr:    sta REG_TILEMAP_L1,x
+        sta REG_TILEMAP_L1+$100,x
+        sta REG_TILEMAP_L1+$200,x
+        sta REG_TILEMAP_L1+$300,x
         inx
         bne clr
 
+        jsr init_starfield
 
 WAIT_VSYNC: 
         lda REG_VSYNC            ; wait till we left bottom border
@@ -591,6 +596,134 @@ offy:   adc #$00
         bne hali4
         rts
 
+;-------------------------------------------------------------
+program_tiles:
+        lda #1                   ; transfer depth: 1 bit clut
+        sta REG_TDEPTH
+        lda #$0                  ; black for 0
+        sta REG_TLOOKUP
+        lda #$ff                 ; white for 1
+        sta REG_TLOOKUP+1
+
+        ldx #0                  ; param = tile id
+        ldy #0                  
+tiles0:
+        lda #1                  ; command = transfer tile
+        sta REG_TCOMMAND  
+        txa
+        sta REG_TPARAMS         ; tile id
+        lda #8                  
+        sta REG_TPARAMS         ; width
+        sta REG_TPARAMS         ; height
+
+        lda tiles_def,y         ; transfer 8 bytes of data
+        sta REG_TDATA
+        lda tiles_def+1,y
+        sta REG_TDATA
+        lda tiles_def+2,y
+        sta REG_TDATA
+        lda tiles_def+4,y
+        sta REG_TDATA
+        lda tiles_def+5,y
+        sta REG_TDATA
+        lda tiles_def+6,y
+        sta REG_TDATA
+        lda tiles_def+7,y
+        sta REG_TDATA
+        tya
+        clc
+        adc #8
+        tay
+        inx
+        cpx #2
+        bne tiles0
+        rts
+
+ 
+tiles_def:
+!byte %00000000
+!byte %00000000
+!byte %00000000
+!byte %00000000
+!byte %00000000
+!byte %00000000
+!byte %00000000
+!byte %00000000
+
+!byte %01000000
+!byte %00000000
+!byte %00000000
+!byte %00000000
+!byte %00000000
+!byte %00000000
+!byte %00000000
+!byte %00000000
+
+random:
+        lda seed
+        beq doEor
+        asl
+        beq noEor ;if the input was $80, skip the EOR
+        bcc noEor
+doEor:    
+        eor #$1d
+noEor:  sta seed
+        rts
+
+seed: 
+!byte $23
+
+starx:
+!fill 200,0
+
+init_starfield:
+
+        ldx #0
+        lda #<REG_TILEMAP_L1
+        sta $54
+        lda #>REG_TILEMAP_L1
+        sta $55
+
+        sta starx
+inits1:        
+        jsr random
+        lsr
+        lsr
+        lsr
+        tay
+        lda #1
+        sta ($54),y
+        jsr random
+        lsr
+        lsr
+        lsr
+        tay
+        lda #1
+        sta ($54),y
+
+        clc
+        lda $54
+        adc #32
+        sta $54
+        bcc inits2
+        inc $55
+inits2:
+        inx
+        cpx #25
+        bne inits1       
+        rts
+
+move_starfield:
+        ldx #0
+        lda #0
+moves0:
+        lda 
+        sta REG_LINES_L0_XSCR,x
+        
+        inx
+        cpx #200
+        bne moves0
+        rts
 
 ;-------------------------------------------------------------
 program_sprites:

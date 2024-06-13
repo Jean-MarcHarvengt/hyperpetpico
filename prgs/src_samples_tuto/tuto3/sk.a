@@ -1,0 +1,690 @@
+!to "sk.prg"
+
+
+*= $0401
+        * = $0401
+        !word bas_end
+        !word $00
+        !byte $9e
+        !text "2048"
+        !byte $00
+bas_end !word $00
+
+
+
+; Graphics
+; tiles/text map
+REG_TEXTMAP_L1    = $8000
+REG_TILEMAP_L1    = $8800
+REG_TILEMAP_L0    = $9000
+; tile id 0-255 in 8x8   tile mode
+; tile id 0-63  in 16x16 tile mode
+
+; sprites (96 max) in L2
+NB_SPRITES_MAX    = 96
+
+REG_SPRITE_IND    = $9800
+REG_SPRITE_XHI    = $9880
+REG_SPRITE_XLO    = $9900
+REG_SPRITE_Y      = $9980
+; id:    0-5 (max 63)
+; hflip: 6
+; vflip: 7
+
+; mode
+REG_VIDEO_MODE    = $9b00
+; 0-1: resolution (0=640x200,1=320x200,2=256x200)
+
+; bg/text color
+REG_BG_COL        = $9b01
+; RGB332
+REG_FG_COL        = $9b0d
+; RGB332
+; R: 5-7, 0x20 -> 0xe0   xxx --- --
+; G: 2-4, 0x04 -> 0x1c   --- xxx -- 
+; B: 0-1, 0x00 -> 0x03   --- --- xx  
+
+; layers config
+REG_LAYERS_CFG    = $9b02
+; 0: L0 on/off (1=on)
+; 1: L1 on/off (1=on)    (off if HIRES and bitmap in L0!)
+; 2: L2 on/off (1=on)
+; 3: L2 inbetween (0 = sprites top)
+; 4: bitmap/tile in L0 (0=bitmap)
+; 5: petfont/tile in L1 (0=petfont)
+; 6: enable scroll area in L0
+; 7: enable scroll area in L1
+
+; tiles config
+REG_TILES_CFG     = $9b0e
+; 0: L0: 0=8x8, 1=16x16
+; 1: L1: 0=8x8, 1=16x16
+; 2-4: xcurtain
+;      0: on/off
+;      1: 8/16 pixels left
+; 5-7: ycurtain
+;      0: on/off
+;      1: 8/16 pixels top
+
+; lines config
+REG_LINES_CFG     = $9b03
+; 0: single/perline background color
+; 1: single/perline L0 xscroll
+; 2: single/perline L1 xscroll
+
+; layer scroll
+REG_XSCROLL_HI    = $9b04
+; 3-0: L0 xscroll HI
+; 7-4: L1 xscroll HI
+REG_XSCROLL_L0    = $9b05
+REG_XSCROLL_L1    = $9b06
+REG_YSCROLL_L0    = $9b07
+REG_YSCROLL_L1    = $9b08
+; 7-0, in pixels
+; scroll area
+REG_SC_START_L0   = $9b09
+REG_SC_END_L0     = $9b0a
+REG_SC_START_L1   = $9b0b
+REG_SC_END_L1     = $9b0c
+; 4-0, in tiles/characters
+
+
+; vsync line (0-200, 200 is overscan) (RD)
+REG_VSYNC         = $9b0f
+;
+; data transfer
+REG_TLOOKUP       = $9a00
+; used as RGB332 LUT for pixels (palette) (WR)
+; also used as 256 scratch buffer for other commands (WR/RD) 
+
+REG_TDEPTH        = $9b10
+; WR
+; 1/2/4/8 bits per pixel (using indexed CLUT)
+; 9 = 8 bits RGB332 no CLUT
+; 0 = compressed
+
+REG_TCOMMAND      = $9b11
+; WR
+; 0: idle
+; 1: transfer tiles data      (data=tilenr,w,h,packet pixels)
+; 2: transfer sprites data    (data=spritenr,w,h,packet pixels)
+; 3: transfer bitmap data     (data=xh,xl,y,wh,wl,h,w*h/packet pixels) 
+; 4: transfer t/fmap col data (data=layer,col,row,size,size/packet tiles)
+; 5: transfer t/fmap row data (data=layer,col,row,size,size/packet tiles)
+; 6: transfer all tile 8bits data compressed (data=sizeh,sizel,pixels)
+; 7: transfer all sprite 8bits data compressed (data=sizeh,sizel,pixels)
+; 8: transfer bitmap 8bits data compressed (data=sizeh,sizel,pixels)
+
+REG_TPARAMS       = $9b12
+; WR
+
+REG_TDATA         = $9b13
+; WR
+
+REG_TSTATUS       = $9b14
+; transfer status (RD) 1=ready for async commands only
+
+; Redefining tiles/sprite sequence
+; 1. write lookup palette entries needed
+; 2. write transfer mode (1/2/4/8/9)
+; 3. write command 1/2
+; 4. write params tile/sprite id,w,h
+; 5. write data sequence (8bytes*plane for tiles, (h*2)bytes*plane for sprites)
+; (any new command to reset)
+;
+; Transfer bitmap sequence
+; 1. write lookup palette entries needed
+; 2. write transfer mode (1/2/4/8/9)
+; 3. write command 3
+; 4. write params XH,XL,Y,WH,WL,H
+; 5. write data sequence (bytes*plane /packed_bits)
+; (any new command to reset)
+
+; lines background color / scroll (200 values)
+REG_LINES_BG_COL  = $9b38
+; RGB332
+REG_LINES_XSCR_HI = $9c00
+; 7-4:  lines L1 xscroll hi, 3-0: L0 xscroll hi
+REG_LINES_L0_XSCR = $9cc8
+REG_LINES_L1_XSCR = $9d90
+;
+; Sprite collision
+; only for first 16 sprites against all the rest (96) 
+; LO (8bits x 96 entries, first 8 sprites, bit0 = sprite 0) 
+; HI (8bits x 96 entries, last  8 sprites, bit0 = sprite 8)
+REG_SPRITE_COL_LO = $9f00 
+REG_SPRITE_COL_HI = $9f80
+;
+; Audio
+; SID (see C64)
+REG_SID_BASE      = $9f00
+
+REG_JOYSTICK      = $e84f
+
+; Joystick macros
+JOY_UP            = (1)
+JOY_DOWN          = (2)
+JOY_LEFT          = (4)
+JOY_RIGHT         = (8) 
+JOY_FIRE          = (1+2)
+
+
+;--------------------------------------------------------
+; Ship
+SHIP_X            = (256-16)/2 
+SHIP_Y            = (200-8) 
+SHIP_BUMP_LEFT    = 0
+SHIP_BUMP_RIGHT   = 255
+SHIP_ID           = 4
+
+
+; Aliens
+ALIENS_NB_ROWS     = 5
+ALIENS_NB_COLS     = 11
+ALIENS_STEP_X      = 16
+ALIENS_STEP_Y      = 16
+ALIENS_BUMP_LEFT   = (0)
+ALIENS_BUMP_RIGHT  = (256-ALIENS_NB_COLS*ALIENS_STEP_X)
+ALIENS_BUMP_UP     = (32)
+ALIENS_BUMP_DOWN   = (32+8*8)
+
+ALIENS_NB         = (ALIENS_NB_ROWS*ALIENS_NB_COLS)
+ALIENS_FIRST_ID   = 5
+
+; Bullets
+BULLETS_FIRST_ID  = 0
+BULLETS_NB        = 1
+
+*= $0800
+
+        lda REG_VIDEO_MODE
+        pha
+        lda REG_LAYERS_CFG
+        pha
+
+        lda #2                  ; change resolution to 256x200
+        sta REG_VIDEO_MODE
+
+        lda #(1+2+4+32)            ; L0,L1,L2
+        sta REG_LAYERS_CFG
+
+        jsr hide_sprites
+
+        jsr program_sprites
+
+
+        lda #SHIP_X
+        sta ssprx
+
+
+
+WAIT_VSYNC: 
+        lda REG_VSYNC            ; wait till we left bottom border
+        cmp #200
+        beq WAIT_VSYNC
+WAIT_VSYNC2:
+        lda REG_VSYNC            ; wait till we reach bottom border
+        cmp #200
+        bne WAIT_VSYNC2
+
+        jsr handle_vsync 
+        cmp #0
+        beq WAIT_VSYNC
+
+
+        jsr hide_sprites
+
+        pla                     ; restore GFX mode
+        sta REG_LAYERS_CFG
+        pla
+        sta REG_VIDEO_MODE
+
+        rts
+
+
+;-------------------------------------------------------------
+handle_vsync:
+        lda #1                  ; ship sprite
+        sta REG_SPRITE_IND+SHIP_ID
+        lda ssprx
+        sta REG_SPRITE_XLO+SHIP_ID
+        lda #SHIP_Y
+        sta REG_SPRITE_Y+SHIP_ID        
+
+        ldx #0                  ; aliens sprites
+al0:
+        lda asprid,x
+        sta REG_SPRITE_IND+ALIENS_FIRST_ID,x
+        lda asprx,x
+        sta REG_SPRITE_XLO+ALIENS_FIRST_ID,x
+        lda aspry,x
+        sta REG_SPRITE_Y+ALIENS_FIRST_ID,x
+        inx
+        cpx #ALIENS_NB
+        bne al0
+
+
+        jsr handle_bullets
+
+        lda REG_JOYSTICK         ; read joystick
+        tay                      ; save to Y
+
+        lda #5                   ; read row 5 of keyboard matrix
+        sta $e810                ; we will use it a joystick bits!
+        lda $e812                ; no key pressed!
+        tax
+        and #$02                 ; 'E'
+        bne hvs0
+        tya                      ; is JOY_LEFT
+        and #!JOY_LEFT
+        tay
+hvs0:
+        txa
+        and #$04                 ; 'T'
+        bne hvs1
+        tya                      ; is JOY_RIGHT
+        and #!JOY_RIGHT
+        tay
+hvs1:
+        txa
+        and #$20                 ; 'O'
+        bne hvs2
+        tya                      ; is JOY_FIRE
+        and #!JOY_FIRE
+        tay
+hvs2:
+        tya
+        and #JOY_FIRE
+        bne hvs3
+
+        lda bsprid              ; ship shoot!
+        bne hvs3
+        lda ssprx
+        adc #8
+        sta bsprx
+        lda #200
+        sta bspry        
+        lda #10
+        sta bsprid
+
+
+hvs3:
+;        tya
+;        and #JOY_UP
+;        beq EXIT_PRG
+;        tya
+;        and #JOY_DOWN
+;        beq EXIT_PRG
+hvs4:
+        tya
+        and #JOY_LEFT           ; ship left
+        bne hvs5
+        dec ssprx
+hvs5:
+        tya
+        and #JOY_RIGHT          ; ship right
+        bne hvs6
+        inc ssprx
+hvs6:
+        
+
+WAIT_KEY:
+        jsr $FFE4               ; Calling KERNAL GETIN 
+        cmp #$20
+        beq EXIT_PRG
+
+EXIT:
+        lda #0
+        rts
+EXIT_PRG:
+        lda #1
+        rts
+
+
+;-------------------------------------------------------------
+handle_bullets:
+        ldx #0
+hbul1:        
+        lda bsprid,x
+        sta REG_SPRITE_IND+BULLETS_FIRST_ID,x
+        cmp #0
+        beq hbul7
+
+        cpx #0                   ; ship bullet ?
+        bne hbul3
+        
+        lda bspry,x              ; go up till 0      
+        cmp #0
+        bne hbul2
+        lda #0                   ; reset id when reached
+        sta bsprid,x
+        jmp hbul6
+hbul2:   
+        dec bspry,x
+        dec bspry,x
+        jmp hbul6
+
+hbul3:
+        lda bspry,x              ; aliens bullet 
+        cmp #199                 ; go down till 199 
+        bne hbul4
+        lda #0                   ; reset id when reached
+        sta bsprid,x
+        jmp hbul6
+hbul4:
+        inc bspry,x        
+hbul6:       
+        sta REG_SPRITE_Y+BULLETS_FIRST_ID,x
+        lda bsprx,x
+        sta REG_SPRITE_XLO+BULLETS_FIRST_ID,x
+
+hbul7:
+        inx
+        cpx #BULLETS_NB
+        bne hbul1
+        rts
+
+;-------------------------------------------------------------
+hide_sprites:
+        ldy #0                    ; Hide all sprites available
+hspr1:
+        lda #$0
+        sta REG_SPRITE_IND,y
+        sta REG_SPRITE_XHI,y
+        sta REG_SPRITE_XLO,y
+        lda #200
+        sta REG_SPRITE_Y,y
+        iny
+        cpy #NB_SPRITES_MAX
+        bne hspr1
+        rts
+
+;-------------------------------------------------------------
+sprite16by8_1bit:   
+        ldy #16                 ; width = 16       
+spriteNby8_1bit:   
+        lda #2                  ; command = transfer sprite
+        sta REG_TCOMMAND 
+        txa                     ; param = sprite id
+        sta REG_TPARAMS
+        tya                     ; width
+        sta REG_TPARAMS 
+        lda #8                  ; height
+        sta REG_TPARAMS
+        ldy #$00                ; transfer 2*8 bytes of data
+sprite11:
+        lda ($54),y
+        sta REG_TDATA
+        iny
+        cpy #2*8
+        bne sprite11
+        rts        
+
+;-------------------------------------------------------------
+program_sprites
+        lda #1                   ; transfer depth: 1 bit clut
+        sta REG_TDEPTH
+        
+        lda #$00
+        sta REG_TLOOKUP
+
+
+        lda #$ff                 ; white for 1
+        sta REG_TLOOKUP+1                
+
+        lda #<sprite_empty
+        sta $54
+        lda #>sprite_empty
+        sta $55
+        ldx #0                  ; sprite id 0
+        jsr sprite16by8_1bit
+
+        lda #<sprite_ship
+        sta $54
+        lda #>sprite_ship
+        sta $55
+        ldx #1                  ; sprite id 1
+        jsr sprite16by8_1bit
+
+        lda #$fc                 ; yellow for 1
+        sta REG_TLOOKUP+1                
+        ldx #2                   ; id 2
+        lda #<sprite_alien1_1
+        sta $54
+        lda #>sprite_alien1_1
+        sta $55
+        jsr sprite16by8_1bit
+        ldx #3                   ; id 3
+        lda #<sprite_alien1_2
+        sta $54
+        lda #>sprite_alien1_2
+        sta $55
+        jsr sprite16by8_1bit
+
+        lda #$1f                 ; cyan for 1
+        sta REG_TLOOKUP+1                
+
+        ldx #4                   ; id 4
+        lda #<sprite_alien2_1
+        sta $54
+        lda #>sprite_alien2_1
+        sta $55
+        jsr sprite16by8_1bit
+        ldx #5                   ; id 5
+        lda #<sprite_alien2_2
+        sta $54
+        lda #>sprite_alien2_2
+        sta $55
+        jsr sprite16by8_1bit
+
+        lda #$e3                 ; yellow for 1
+        sta REG_TLOOKUP+1                
+        ldx #6                   ; id 6
+        lda #<sprite_alien3_1
+        sta $54
+        lda #>sprite_alien3_1
+        sta $55
+        jsr sprite16by8_1bit
+        ldx #7                   ; id 7
+        lda #<sprite_alien3_2
+        sta $54
+        lda #>sprite_alien3_2
+        sta $55
+        jsr sprite16by8_1bit
+
+        ldx #8                   ; id 8
+        lda #<sprite_alien_exp
+        sta $54
+        lda #>sprite_alien_exp
+        sta $55
+        jsr sprite16by8_1bit
+
+        ldx #9                   ; id 9
+        lda #<sprite_saucer
+        sta $54
+        lda #>sprite_saucer
+        sta $55
+        jsr sprite16by8_1bit
+        
+        lda #$e0                 ; red for 1
+        sta REG_TLOOKUP+1                
+        ldx #10                  ; id 10
+        lda #<sprite_bullet1
+        sta $54
+        lda #>sprite_bullet1
+        sta $55
+        ldy #2
+        jsr spriteNby8_1bit        
+        ldx #11                  ; id 11
+        lda #<sprite_bullet2
+        sta $54
+        lda #>sprite_bullet2
+        sta $55
+        ldy #2
+        jsr spriteNby8_1bit  
+        rts        
+
+
+;-------------------------------------------------------------
+; 16x8 pixels
+sprite_empty:
+!byte %00000000,%00000000
+!byte %00000000,%00000000
+!byte %00000000,%00000000
+!byte %00000000,%00000000
+!byte %00000000,%00000000
+!byte %00000000,%00000000
+!byte %00000000,%00000000
+!byte %00000000,%00000000
+
+sprite_ship:
+!byte %00000000,%10000000
+!byte %00000001,%11000000
+!byte %00000001,%11000000
+!byte %00011111,%11111100
+!byte %00111111,%11111110
+!byte %00111111,%11111110
+!byte %00111111,%11111110
+!byte %00111111,%11111110
+
+
+sprite_alien1_1:
+!byte %00000001,%10000000
+!byte %00000011,%11000000
+!byte %00000111,%11100000
+!byte %00001101,%10110000
+!byte %00001111,%11110000
+!byte %00000010,%01000000
+!byte %00000101,%10100000
+!byte %00001010,%01010000
+sprite_alien1_2:
+!byte %00000001,%10000000
+!byte %00000011,%11000000
+!byte %00000111,%11100000
+!byte %00001101,%10110000
+!byte %00001111,%11110000
+!byte %00000101,%10100000
+!byte %00001001,%10010000
+!byte %00000100,%00100000
+
+sprite_alien2_1:
+!byte %00000100,%00010000
+!byte %00010010,%00100100
+!byte %00010111,%11110100
+!byte %00011101,%11011100
+!byte %00011111,%11111100
+!byte %00001111,%11111000
+!byte %00000100,%00010000
+!byte %00001000,%00001000
+sprite_alien2_2:
+!byte %00000100,%00010000
+!byte %00000010,%00100000
+!byte %00000111,%11110000
+!byte %00001101,%11011000
+!byte %00011111,%11111100
+!byte %00010111,%11110100
+!byte %00010100,%00010100
+!byte %00000011,%01100000
+
+sprite_alien3_1:
+!byte %00000011,%11000000
+!byte %00011111,%11111000
+!byte %00111111,%11111100
+!byte %00111001,%10011100
+!byte %00111111,%11111100
+!byte %00000110,%01100000
+!byte %00001101,%10110000
+!byte %00110000,%00001100
+sprite_alien3_2:
+!byte %00000011,%11000000
+!byte %00011111,%11111000
+!byte %00111111,%11111100
+!byte %00111001,%10011100
+!byte %00111111,%11111100
+!byte %00001110,%01110000
+!byte %00011001,%10011000
+!byte %00001100,%00110000
+
+sprite_alien_exp:
+!byte %00000100,%01000000
+!byte %00100010,%10001000
+!byte %00010000,%00010000
+!byte %00001000,%00100000
+!byte %01100000,%00001100
+!byte %00001000,%00100000
+!byte %00010010,%10010000
+!byte %00100100,%01001000
+
+sprite_saucer:
+!byte %00000000,%00000000
+!byte %00000111,%11100000
+!byte %00011111,%11111000
+!byte %00111111,%11111100
+!byte %01101101,%10110110
+!byte %11111111,%11111111
+!byte %00111000,%00011100
+!byte %00010000,%00001000
+
+sprite_bullet1:
+!byte %11000000,%00000000
+!byte %11000000,%00000000
+!byte %11000000,%00000000
+!byte %11000000,%00000000
+!byte %11000000,%00000000
+!byte %11000000,%00000000
+!byte %11000000,%00000000
+!byte %11000000,%00000000
+
+sprite_bullet2:
+!byte %01000000,%00000000
+!byte %10000000,%00000000
+!byte %01000000,%00000000
+!byte %10000000,%00000000
+!byte %01000000,%00000000
+!byte %10000000,%00000000
+!byte %01000000,%00000000
+!byte %10000000,%00000000
+
+
+
+;-------------------------------------------------------------
+; Ship data
+
+ssprx:
+!byte 0
+
+;-------------------------------------------------------------
+; Bullets data
+
+bsprx:
+!byte 0
+
+bspry:
+!byte 0
+
+bsprid:
+!byte 0
+
+;-------------------------------------------------------------
+; Aliens data
+
+asprx:
+!byte 0*ALIENS_STEP_X,1*ALIENS_STEP_X,2*ALIENS_STEP_X,3*ALIENS_STEP_X,4*ALIENS_STEP_X,5*ALIENS_STEP_X,6*ALIENS_STEP_X,7*ALIENS_STEP_X,8*ALIENS_STEP_X,9*ALIENS_STEP_X,10*ALIENS_STEP_X
+!byte 0*ALIENS_STEP_X,1*ALIENS_STEP_X,2*ALIENS_STEP_X,3*ALIENS_STEP_X,4*ALIENS_STEP_X,5*ALIENS_STEP_X,6*ALIENS_STEP_X,7*ALIENS_STEP_X,8*ALIENS_STEP_X,9*ALIENS_STEP_X,10*ALIENS_STEP_X
+!byte 0*ALIENS_STEP_X,1*ALIENS_STEP_X,2*ALIENS_STEP_X,3*ALIENS_STEP_X,4*ALIENS_STEP_X,5*ALIENS_STEP_X,6*ALIENS_STEP_X,7*ALIENS_STEP_X,8*ALIENS_STEP_X,9*ALIENS_STEP_X,10*ALIENS_STEP_X
+!byte 0*ALIENS_STEP_X,1*ALIENS_STEP_X,2*ALIENS_STEP_X,3*ALIENS_STEP_X,4*ALIENS_STEP_X,5*ALIENS_STEP_X,6*ALIENS_STEP_X,7*ALIENS_STEP_X,8*ALIENS_STEP_X,9*ALIENS_STEP_X,10*ALIENS_STEP_X
+!byte 0*ALIENS_STEP_X,1*ALIENS_STEP_X,2*ALIENS_STEP_X,3*ALIENS_STEP_X,4*ALIENS_STEP_X,5*ALIENS_STEP_X,6*ALIENS_STEP_X,7*ALIENS_STEP_X,8*ALIENS_STEP_X,9*ALIENS_STEP_X,10*ALIENS_STEP_X
+
+aspry:
+!byte 0*ALIENS_STEP_Y,0*ALIENS_STEP_Y,0*ALIENS_STEP_Y,0*ALIENS_STEP_Y,0*ALIENS_STEP_Y,0*ALIENS_STEP_Y,0*ALIENS_STEP_Y,0*ALIENS_STEP_Y,0*ALIENS_STEP_Y,0*ALIENS_STEP_Y,0*ALIENS_STEP_Y
+!byte 1*ALIENS_STEP_Y,1*ALIENS_STEP_Y,1*ALIENS_STEP_Y,1*ALIENS_STEP_Y,1*ALIENS_STEP_Y,1*ALIENS_STEP_Y,1*ALIENS_STEP_Y,1*ALIENS_STEP_Y,1*ALIENS_STEP_Y,1*ALIENS_STEP_Y,1*ALIENS_STEP_Y
+!byte 2*ALIENS_STEP_Y,2*ALIENS_STEP_Y,2*ALIENS_STEP_Y,2*ALIENS_STEP_Y,2*ALIENS_STEP_Y,2*ALIENS_STEP_Y,2*ALIENS_STEP_Y,2*ALIENS_STEP_Y,2*ALIENS_STEP_Y,2*ALIENS_STEP_Y,2*ALIENS_STEP_Y
+!byte 3*ALIENS_STEP_Y,3*ALIENS_STEP_Y,3*ALIENS_STEP_Y,3*ALIENS_STEP_Y,3*ALIENS_STEP_Y,3*ALIENS_STEP_Y,3*ALIENS_STEP_Y,3*ALIENS_STEP_Y,3*ALIENS_STEP_Y,3*ALIENS_STEP_Y,3*ALIENS_STEP_Y
+!byte 4*ALIENS_STEP_Y,4*ALIENS_STEP_Y,4*ALIENS_STEP_Y,4*ALIENS_STEP_Y,4*ALIENS_STEP_Y,4*ALIENS_STEP_Y,4*ALIENS_STEP_Y,4*ALIENS_STEP_Y,4*ALIENS_STEP_Y,4*ALIENS_STEP_Y,4*ALIENS_STEP_Y
+
+asprid:
+!byte 2,2,2,2,2,2,2,2,2,2,2
+!byte 4,4,4,4,4,4,4,4,4,4,4
+!byte 4,4,4,4,4,4,4,4,4,4,4
+!byte 6,6,6,6,6,6,6,6,6,6,6
+!byte 6,6,6,6,6,6,6,6,6,6,6
