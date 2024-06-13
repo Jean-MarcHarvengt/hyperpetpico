@@ -8,6 +8,7 @@ The HyperPET pico project intents to upgrade the PET to a modern 6502 system, wi
 Have a look at the YouTube videos:<br>
 [HyperPET pico Introduction](https://youtu.be/iDc6OViZffg?si=Qh3PRVBwq7JelLfL)<br>
 [HyperPET pico In Standalone Mode](https://youtu.be/M_f5vOrPuFs?si=RCkrxrRP44IA1p1Q)<br>
+[HyperPET pico Assembling the Inner-Board](https://youtu.be/Ujg4q-dqkjs?si=gjwIFBtap3c-Fr7f)<br>
 [HyperPET pico Development Tutorial (Part1)](https://youtu.be/D6H2RW0BwQ0?si=l-4htJ7oOXDetJPa)<br>
 [HyperPET pico Development Tutorial (Part2: sprites graphical objects)](https://youtu.be/8ZjlqQmJXdo?si=lpqTXvzPPhYjKBgU)<br>
 
