@@ -22,7 +22,6 @@ ROWLEN_HI  = 80
 FILENAME_SIZE  = 20
 
 *= $0800
-;*= $7000
         jmp topdir              ; goto root dir and clear
 
 loop:    
@@ -443,7 +442,7 @@ print_f1:
         rts
 
 ;-------------------------------------------------------------
-c80nbbytes  = $8000+$7d0-150       ; top of videomem in 80cols
+c80nbbytes  = $8000+$7e4-139       ; top of videomem in 80cols
 c80load_prg:
         sei
         pha
@@ -452,7 +451,7 @@ c80copycodeprg:
         lda c80codeloadprg,x
         sta c80nbbytes,x
         inx
-        cpx #150
+        cpx #139
         bne c80copycodeprg
         jmp c80nbbytes+1
 
@@ -465,12 +464,9 @@ c80codeloadprg:
 c80load0:
         lda REG_TSTATUS
         bne c80load0
-
-
-
         lda REG_TLOOKUP         ; nb bytes
         beq c80load7            ; end of program
-        sta c80nbbytes             
+        sta c80nbbytes
         lda REG_TLOOKUP+1       ; start address lo
         sta $54
         lda REG_TLOOKUP+2       ; start address hi
@@ -482,19 +478,14 @@ c80load0:
 c80load1:        
         lda REG_TLOOKUP+3,x     ; read data byte        
         sta ($54),y             ; store it 
-        clc
-        lda $54
-        adc #1
-        sta $54
-        bcc c80load2             
+        iny
+        bne c80load2             
         inc $55          
-c80load2:
-        clc   
+c80load2:   
         inx
         cpx c80nbbytes
         bne c80load1
 c80load3:
-
 
         lda #28                 ; cmd_readfile
         sta REG_TCOMMAND
@@ -503,18 +494,15 @@ c80load4:
         bne c80load4
         lda REG_TLOOKUP         ; nb bytes
         beq c80load7            ; end of file
+        sta c80nbbytes
         ldx #00
 c80load5:        
         lda REG_TLOOKUP+1,x     ; read data byte        
         sta ($54),y             ; store it 
-        clc
-        lda $54
-        adc #1
-        sta $54
-        bcc c80load6             
+        iny
+        bne c80load6             
         inc $55          
-c80load6:
-        clc    
+c80load6:   
         inx
         cpx c80nbbytes
         bne c80load5
@@ -522,7 +510,6 @@ c80load6:
 
 c80load7:
 ;        cli
-
 ;WAIT_KEY1
 ;        jsr $FFE4               ; Calling KERNAL GETIN 
 ;        beq WAIT_KEY1
@@ -541,28 +528,20 @@ c80load7:
         sta $2d
         sta $2f
         sta $ca
-        cli
-
-        rts
-
-
 
         lda #$20
         ldx #00
 c80erase:
-        sta c80nbbytes;,x
+        sta c80nbbytes,x
         inx
-        cpx #150
+        cpx #(139-20)
         bne c80erase
         cli
-
         rts
 
 
-
-
 ;-------------------------------------------------------------
-c40nbbytes  = $8000+$400-153    ; top of videomem in 40cols
+c40nbbytes  = $8000+$3fc-139    ; top of videomem in 40cols
 c40load_prg:
         sei
         pha
@@ -571,7 +550,7 @@ c40copycodeprg:
         lda c40codeloadprg,x
         sta c40nbbytes,x
         inx
-        cpx #$99
+        cpx #139
         bne c40copycodeprg
         jmp c40nbbytes+1
 
@@ -586,7 +565,7 @@ c40load0:
         bne c40load0
         lda REG_TLOOKUP         ; nb bytes
         beq c40load7            ; end of program
-        sta c40nbbytes             
+        sta c40nbbytes
         lda REG_TLOOKUP+1       ; start address lo
         sta $54
         lda REG_TLOOKUP+2       ; start address hi
@@ -598,44 +577,41 @@ c40load0:
 c40load1:        
         lda REG_TLOOKUP+3,x     ; read data byte        
         sta ($54),y             ; store it 
-        clc
-        lda $54
-        adc #1
-        sta $54
-        bcc c40load2             
+        iny
+        bne c40load2             
         inc $55          
 c40load2:   
         inx
         cpx c40nbbytes
         bne c40load1
 c40load3:
+
         lda #28                 ; cmd_readfile
         sta REG_TCOMMAND
 c40load4:
         lda REG_TSTATUS
         bne c40load4
         lda REG_TLOOKUP         ; nb bytes
-        sta c40nbbytes 
         beq c40load7            ; end of file
-        ldy #00                 ; index
+        sta c40nbbytes
         ldx #00
 c40load5:        
         lda REG_TLOOKUP+1,x     ; read data byte        
         sta ($54),y             ; store it 
-        clc
-        lda $54
-        adc #1
-        sta $54
-        bcc c40load6             
+        iny
+        bne c40load6             
         inc $55          
-c40load6:    
+c40load6:   
         inx
         cpx c40nbbytes
         bne c40load5
         beq c40load3
 
 c40load7:
-
+;        cli
+;WAIT_KEY1
+;        jsr $FFE4               ; Calling KERNAL GETIN 
+;        beq WAIT_KEY1
 
         lda $28
         sta $c7
@@ -651,12 +627,13 @@ c40load7:
         sta $2d
         sta $2f
         sta $ca
+
         lda #$20
         ldx #00
 c40erase:
         sta c40nbbytes,x
         inx
-        cpx #$8b
+        cpx #(139-20)
         bne c40erase
         cli
         rts
@@ -685,11 +662,8 @@ waitstatusdone3:
 load5:        
         lda REG_TLOOKUP+1,x     ; read data byte        
         sta ($54),y             ; store it 
-        clc
-        lda $54
-        adc #1
-        sta $54
-        bcc load6             
+        iny
+        bne load6             
         inc $55          
 load6:   
         inx
@@ -703,18 +677,14 @@ waitstatusdone4:
         lda REG_TSTATUS
         bne waitstatusdone4
         lda REG_TLOOKUP         ; nb bytes
-        sta nbbytesrom 
         beq exitloadrom
-        ldy #00                 ; index
+        sta nbbytesrom 
         ldx #00
 load7:        
         lda REG_TLOOKUP+1,x     ; read data byte        
         sta ($54),y             ; store it 
-        clc
-        lda $54
-        adc #1
-        sta $54
-        bcc load8             
+        iny
+        bne load8             
         inc $55          
 load8:    
         inx

@@ -758,7 +758,6 @@ static void handleCmdQueue(void) {
       case cmd_readfile:
         nbread = 0; 
         if (fatfs_mounted) {
-          file_block_wr_pt = 1;
           f_read (&file, (void*)&mem[REG_TLOOKUP+1], 255, &nbread);
           if (!nbread) f_close(&file);
         }
