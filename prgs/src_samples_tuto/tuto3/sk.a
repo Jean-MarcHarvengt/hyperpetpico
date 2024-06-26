@@ -172,11 +172,8 @@ JOY_FIRE          = (1+2)
 ;--------------------------------------------------------
 ; Ship
 SHIP_X            = (256-16)/2 
-SHIP_Y            = (200-8) 
-SHIP_BUMP_LEFT    = 0
-SHIP_BUMP_RIGHT   = 255
+SHIP_Y            = (200-8)
 SHIP_ID           = 4
-
 
 ; Aliens
 ALIENS_NB_ROWS     = 5
@@ -194,6 +191,13 @@ ALIENS_FIRST_ID   = 5
 ; Bullets
 BULLETS_FIRST_ID  = 0
 BULLETS_NB        = 1
+BULLET_SHIP_SPID  = 10
+BULLET_ALIEN_SPID = 11
+
+; Starfield
+STARS_NB          = (200-40)
+
+
 
 *= $0800
 
@@ -204,101 +208,63 @@ BULLETS_NB        = 1
 
         lda #2                  ; change resolution to 256x200
         sta REG_VIDEO_MODE
-
         lda #(1+2+4+32)            ; L0,L1,L2
         sta REG_LAYERS_CFG
 
         jsr hide_sprites
-
         jsr program_sprites
-
+        jsr program_tiles
 
         lda #SHIP_X
         sta ssprx
 
+        jsr init_starfield
 
-
-WAIT_VSYNC: 
-        lda REG_VSYNC            ; wait till we left bottom border
+WAIT_VSYNC1: 
+        lda REG_VSYNC           ; wait till we reach bottom border
         cmp #200
-        beq WAIT_VSYNC
-WAIT_VSYNC2:
-        lda REG_VSYNC            ; wait till we reach bottom border
-        cmp #200
-        bne WAIT_VSYNC2
+        bne WAIT_VSYNC1
 
         jsr handle_vsync 
         cmp #0
-        beq WAIT_VSYNC
+        bne exit 
 
+WAIT_VSYNC2:
+        lda REG_VSYNC           ; wait till we left bottom border (in case of!)
+        cmp #200
+        beq WAIT_VSYNC2
+        jmp WAIT_VSYNC1
 
+exit:
+        ldx #0                  ; restore per line scrolling
+        lda #0
+lxscr1:
+        sta REG_LINES_L1_XSCR,x
+        inx
+        cpx #200
+        bne lxscr1
+        
         jsr hide_sprites
-
         pla                     ; restore GFX mode
         sta REG_LAYERS_CFG
         pla
         sta REG_VIDEO_MODE
-
         rts
 
 
 ;-------------------------------------------------------------
 handle_vsync:
-        lda #1                  ; ship sprite
-        sta REG_SPRITE_IND+SHIP_ID
-        lda ssprx
-        sta REG_SPRITE_XLO+SHIP_ID
-        lda #SHIP_Y
-        sta REG_SPRITE_Y+SHIP_ID        
-
-        ldx #0                  ; aliens sprites
-al0:
-        lda asprid,x
-        sta REG_SPRITE_IND+ALIENS_FIRST_ID,x
-        lda asprx,x
-        sta REG_SPRITE_XLO+ALIENS_FIRST_ID,x
-        lda aspry,x
-        sta REG_SPRITE_Y+ALIENS_FIRST_ID,x
-        inx
-        cpx #ALIENS_NB
-        bne al0
-
-
+        jsr handle_ship
+        jsr handle_aliens
         jsr handle_bullets
-
-        lda REG_JOYSTICK         ; read joystick
-        tay                      ; save to Y
-
-        lda #5                   ; read row 5 of keyboard matrix
-        sta $e810                ; we will use it a joystick bits!
-        lda $e812                ; no key pressed!
-        tax
-        and #$02                 ; 'E'
-        bne hvs0
-        tya                      ; is JOY_LEFT
-        and #!JOY_LEFT
-        tay
-hvs0:
-        txa
-        and #$04                 ; 'T'
-        bne hvs1
-        tya                      ; is JOY_RIGHT
-        and #!JOY_RIGHT
-        tay
-hvs1:
-        txa
-        and #$20                 ; 'O'
-        bne hvs2
-        tya                      ; is JOY_FIRE
-        and #!JOY_FIRE
-        tay
-hvs2:
+        jsr handle_starfield
+        
+        jsr read_joystick       ; joystick bits in Y register
         tya
-        and #JOY_FIRE
-        bne hvs3
-
-        lda bsprid              ; ship shoot!
-        bne hvs3
+        and #JOY_FIRE           ; ship shoot!
+        bne hvs1
+        lda bsprid              
+        bne hvs1
         lda ssprx
         adc #8
         sta bsprx
@@ -306,9 +272,18 @@ hvs2:
         sta bspry        
         lda #10
         sta bsprid
-
-
+hvs1:
+        tya
+        and #JOY_LEFT           ; ship left
+        bne hvs2
+        dec ssprx
+hvs2:
+        tya
+        and #JOY_RIGHT          ; ship right
+        bne hvs3
+        inc ssprx
 hvs3:
+
 ;        tya
 ;        and #JOY_UP
 ;        beq EXIT_PRG
@@ -316,17 +291,8 @@ hvs3:
 ;        and #JOY_DOWN
 ;        beq EXIT_PRG
 hvs4:
-        tya
-        and #JOY_LEFT           ; ship left
-        bne hvs5
-        dec ssprx
-hvs5:
-        tya
-        and #JOY_RIGHT          ; ship right
-        bne hvs6
-        inc ssprx
-hvs6:
-        
+
+     
 
 WAIT_KEY:
         jsr $FFE4               ; Calling KERNAL GETIN 
@@ -340,6 +306,61 @@ EXIT_PRG:
         lda #1
         rts
 
+;-------------------------------------------------------------
+read_joystick:
+        lda REG_JOYSTICK         ; read joystick
+        tay                      ; save to Y
+
+        lda #5                   ; read row 5 of keyboard matrix
+        sta $e810                ; we will use it a joystick bits!
+        lda $e812                ; no key pressed!
+        tax
+        and #$02                 ; 'E'
+        bne joy0
+        tya                      ; is JOY_LEFT
+        and #!JOY_LEFT
+        tay
+joy0:
+        txa
+        and #$04                 ; 'T'
+        bne joy1
+        tya                      ; is JOY_RIGHT
+        and #!JOY_RIGHT
+        tay
+joy1:
+        txa
+        and #$20                 ; 'O'
+        bne joy2
+        tya                      ; is JOY_FIRE
+        and #!JOY_FIRE
+        tay
+joy2:
+        rts
+
+;-------------------------------------------------------------
+handle_ship:
+        lda #1                  ; ship sprite
+        sta REG_SPRITE_IND+SHIP_ID
+        lda ssprx
+        sta REG_SPRITE_XLO+SHIP_ID
+        lda #SHIP_Y
+        sta REG_SPRITE_Y+SHIP_ID        
+        rts
+
+;-------------------------------------------------------------
+handle_aliens:        
+        ldx #0                  ; aliens sprites
+al0:
+        lda asprid,x
+        sta REG_SPRITE_IND+ALIENS_FIRST_ID,x
+        lda asprx,x
+        sta REG_SPRITE_XLO+ALIENS_FIRST_ID,x
+        lda aspry,x
+        sta REG_SPRITE_Y+ALIENS_FIRST_ID,x
+        inx
+        cpx #ALIENS_NB
+        bne al0
+        rts
 
 ;-------------------------------------------------------------
 handle_bullets:
@@ -382,6 +403,24 @@ hbul7:
         inx
         cpx #BULLETS_NB
         bne hbul1
+
+
+
+        ldx #0                  ; test collision with ship bullet for all aliens
+hbul8:
+        lda asprid,x            ; alien still there?
+        beq hbul9
+        lda REG_SPRITE_COL_LO+ALIENS_FIRST_ID,x ; has colision with bullet
+        and #1                  ; ship bullet = sprite 0, bit0
+        beq hbul9
+        lda #0                  ; alien and bullet off
+        sta bsprid
+        sta asprid,x
+hbul9:
+        inx
+        cpx #ALIENS_NB
+        bne hbul8
+
         rts
 
 ;-------------------------------------------------------------
@@ -523,6 +562,138 @@ program_sprites
         ldy #2
         jsr spriteNby8_1bit  
         rts        
+
+;-------------------------------------------------------------
+program_tiles:
+        lda #2                  ; transfer depth: 2 bit clut
+        sta REG_TDEPTH
+        lda #$00                ; black for 0
+        sta REG_TLOOKUP
+        lda #$40+$08+$01        ; grey1 for 1
+        sta REG_TLOOKUP+1
+        lda #$80+$10+$02        ; grey2 for 2
+        sta REG_TLOOKUP+2
+        lda #$ff                ; white for 3
+        sta REG_TLOOKUP+3
+
+        ldx #0                  ; param = tile id
+        ldy #0                  
+tiles0:
+        lda #1                  ; command = transfer tile
+        sta REG_TCOMMAND  
+        txa
+        sta REG_TPARAMS         ; tile id
+        lda #8                  
+        sta REG_TPARAMS         ; width
+        sta REG_TPARAMS         ; height
+
+        lda tiles2bits_def,y    ; transfer 16 bytes of data
+        sta REG_TDATA
+        lda tiles2bits_def+1,y
+        sta REG_TDATA
+        lda tiles2bits_def+2,y
+        sta REG_TDATA
+        lda tiles2bits_def+4,y
+        sta REG_TDATA
+        lda tiles2bits_def+5,y
+        sta REG_TDATA
+        lda tiles2bits_def+6,y
+        sta REG_TDATA
+        lda tiles2bits_def+7,y
+        sta REG_TDATA
+        lda tiles2bits_def+8,y
+        sta REG_TDATA
+        lda tiles2bits_def+9,y
+        sta REG_TDATA
+        lda tiles2bits_def+10,y
+        sta REG_TDATA
+        lda tiles2bits_def+11,y
+        sta REG_TDATA
+        lda tiles2bits_def+12,y
+        sta REG_TDATA
+        lda tiles2bits_def+13,y
+        sta REG_TDATA
+        lda tiles2bits_def+14,y
+        sta REG_TDATA
+        lda tiles2bits_def+15,y
+        sta REG_TDATA
+        tya
+        clc
+        adc #16
+        tay
+        inx
+        cpx #2
+        bne tiles0
+        rts
+
+;-------------------------------------------------------------
+handle_starfield:
+        ldx #0
+moves0:
+        lda starxinc,x
+        sta movinc+1
+        lda starx,x
+movinc: adc #00        
+        sta starx,x
+        sta REG_LINES_L1_XSCR,x
+        inx
+        cpx #STARS_NB
+        bne moves0
+        rts
+
+init_starfield:
+        lda #$04
+        sta REG_LINES_CFG
+        ldx #0
+        lda #<REG_TILEMAP_L1
+        sta $54
+        lda #>REG_TILEMAP_L1
+        sta $55
+inits1: 
+        jsr random
+        and #$1f
+        tay
+        lda #1
+        sta ($54),y
+        jsr random
+        and #$1f
+        tay
+        lda #1
+        sta ($54),y
+        clc
+        lda $54
+        adc #32
+        sta $54
+        bcc inits2
+        inc $55
+inits2:
+        inx
+        cpx #(STARS_NB/8)
+        bne inits1       
+
+        ldx #0
+inits3: 
+        jsr random
+        sta starx,x
+        jsr random
+        and #$3
+        sta starxinc,x
+        inx
+        cpx #STARS_NB
+        bne inits3 
+        rts
+
+;-------------------------------------------------------------
+random:
+        lda seed
+        beq doEor
+        asl
+        beq noEor ;if the input was $80, skip the EOR
+        bcc noEor
+doEor:    
+        eor #$1d
+noEor:  sta seed
+        rts
 
 
 ;-------------------------------------------------------------
@@ -688,3 +859,40 @@ asprid:
 !byte 4,4,4,4,4,4,4,4,4,4,4
 !byte 6,6,6,6,6,6,6,6,6,6,6
 !byte 6,6,6,6,6,6,6,6,6,6,6
+
+;-------------------------------------------------------------
+; Starfield data
+
+starx:
+!fill STARS_NB,0
+starxinc:
+!fill STARS_NB,0
+
+;-------------------------------------------------------------
+; Other data
+seed: 
+!byte $23
+
+
+;-------------------------------------------------------------
+; Tiles definition
+
+tiles2bits_def:
+!byte %00000000,%00000000
+!byte %00000000,%00000000
+!byte %00000000,%00000000
+!byte %00000000,%00000000
+!byte %00000000,%00000000
+!byte %00000000,%00000000
+!byte %00000000,%00000000
+!byte %00000000,%00000000
+
+!byte %10000000,%00000000
+!byte %01000000,%00000000
+!byte %11000000,%00000000
+!byte %10000000,%00000000
+!byte %01000000,%00000000
+!byte %11000000,%00000000
+!byte %10000000,%00000000
+!byte %01000000,%00000000
+

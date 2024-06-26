@@ -159,16 +159,21 @@ REG_SPRITE_COL_HI = $9f80
 ; SID (see C64)
 REG_SID_BASE      = $9f00
 
+REG_JOYSTICK      = $e84f
+
+; Joystick macros
+JOY_UP            = (1)
+JOY_DOWN          = (2)
+JOY_LEFT          = (4)
+JOY_RIGHT         = (8) 
+JOY_FIRE          = (1+2)
 
 
 ;--------------------------------------------------------
 ; Ship
 SHIP_X            = (256-16)/2 
 SHIP_Y            = (200-8) 
-SHIP_BUMP_LEFT    = 0
-SHIP_BUMP_RIGHT   = 255
 SHIP_ID           = 4
-
 
 ; Aliens
 ALIENS_NB_ROWS     = 5
@@ -194,14 +199,11 @@ ALIENS_FIRST_ID   = 5
 
         lda #2                  ; change resolution to 256x200
         sta REG_VIDEO_MODE
-
-        lda #(1+2+4+32)            ; L0,L1,L2
+        lda #(1+2+4+32)         ; L0,L1,L2
         sta REG_LAYERS_CFG
 
         jsr hide_sprites
-
         jsr program_sprites
-
 
         lda #SHIP_X
         sta ssprx
@@ -225,18 +227,15 @@ al0:
         cpx #ALIENS_NB
         bne al0
 
-
 WAIT_KEY:
         jsr $FFE4               ; Calling KERNAL GETIN 
         beq WAIT_KEY
 
         jsr hide_sprites
-
         pla                     ; restore GFX mode
         sta REG_LAYERS_CFG
         pla
         sta REG_VIDEO_MODE
-
         rts
 
 

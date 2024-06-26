@@ -375,21 +375,63 @@ void __not_in_flash("VideoRenderUpdate") VideoRenderUpdate(void)
     {
       uint16_t x1 = (mem[REG_SPRITE_XHI+i]<<8)+mem[REG_SPRITE_XLO+i];    
       uint8_t y1 = mem[REG_SPRITE_Y+i];
-      uint8_t id1 = mem[REG_SPRITE_IND+i]&0x3f; 
+      uint8_t id1 = mem[REG_SPRITE_IND+i]&0x3f;
+      // hflip
+      if (mem[REG_SPRITE_IND+i] & 0x40) x1 = SPRITEW-x1;
+      // vflip
+      if (mem[REG_SPRITE_IND+i] & 0x80) y1 = SpriteDataW[id1]-y1;
       uint8_t colbits = 0;
       if (id1) {
         for (int k = 0; k < 8; k++)
         {
-          uint16_t x = (mem[REG_SPRITE_XHI+k]<<8)+mem[REG_SPRITE_XLO+k];    
-          uint8_t y  = mem[REG_SPRITE_Y+k];
-          uint8_t id = mem[REG_SPRITE_IND+k]&0x3f;
-          if ( (id) && (x >= x1) && (x < (x1+SpriteDataW[id1])) && (y >= y1) && (y < (y1+SpriteDataH[id1])) )
-          {
-            colbits += (1<<k);
-          }  
+          if (k != i) {
+            uint16_t x = (mem[REG_SPRITE_XHI+k]<<8)+mem[REG_SPRITE_XLO+k];    
+            uint8_t y  = mem[REG_SPRITE_Y+k];
+            uint8_t id = mem[REG_SPRITE_IND+k]&0x3f;
+            // hflip
+            if (mem[REG_SPRITE_IND+k] & 0x40) x = SPRITEW-x;
+            // vflip
+            if (mem[REG_SPRITE_IND+k] & 0x80) y = SpriteDataW[id]-y;            
+            if ( (id) && (x >= x1) && (x < (x1+SpriteDataW[id1])) && (y >= y1) && (y < (y1+SpriteDataH[id1])) )
+            {
+              colbits += (1<<k);
+            }
+            
+            if ( (id) && (x1 >= x) && (x1 < (x+SpriteDataW[id])) && (y1 >= y) && (y1 < (y+SpriteDataH[id])) )
+            {
+              colbits += (1<<k);
+            }
+          }           
         }
-      }     
-      mem[REG_SPRITE_COL_LO+i] = colbits; 
+      }   
+      mem[REG_SPRITE_COL_LO+i] = colbits;
+      /*
+      colbits = 0;
+      if (id1) {
+        for (int k = 8; k < 16; k++)
+        {
+          if (k != i) {
+            uint16_t x = (mem[REG_SPRITE_XHI+k]<<8)+mem[REG_SPRITE_XLO+k];    
+            uint8_t y  = mem[REG_SPRITE_Y+k];
+            uint8_t id = mem[REG_SPRITE_IND+k]&0x3f;
+            // hflip
+            if (mem[REG_SPRITE_IND+k] & 0x40) x = SPRITEW-x;
+            // vflip
+            if (mem[REG_SPRITE_IND+k] & 0x80) y = SpriteDataW[id]-y;            
+            if ( (id) && (x >= x1) && (x < (x1+SpriteDataW[id1])) && (y >= y1) && (y < (y1+SpriteDataH[id1])) )
+            {
+              colbits += (1<<(k-8));
+            }
+            
+            if ( (id) && (x1 >= x) && (x1 < (x+SpriteDataW[id])) && (y1 >= y) && (y1 < (y+SpriteDataH[id])) )
+            {
+              colbits += (1<<(k-8));
+            }
+          }           
+        }
+      }   
+      mem[REG_SPRITE_COL_HI+i] = colbits;
+      */       
     }
     sid_dump();
 #ifndef HAS_PETIO

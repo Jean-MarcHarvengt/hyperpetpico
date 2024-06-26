@@ -159,7 +159,17 @@ REG_SPRITE_COL_HI = $9f80
 ; SID (see C64)
 REG_SID_BASE      = $9f00
 
+REG_JOYSTICK      = $e84f
 
+; Joystick macros
+JOY_UP            = (1)
+JOY_DOWN          = (2)
+JOY_LEFT          = (4)
+JOY_RIGHT         = (8) 
+JOY_FIRE          = (1+2)
+
+
+;--------------------------------------------------------
 *= $0800
 
 
