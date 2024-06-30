@@ -11,6 +11,7 @@ Have a look at the YouTube videos:<br>
 [HyperPET pico Assembling the Inner-Board](https://youtu.be/Ujg4q-dqkjs?si=gjwIFBtap3c-Fr7f)<br>
 [HyperPET pico Development Tutorial (Part1)](https://youtu.be/D6H2RW0BwQ0?si=l-4htJ7oOXDetJPa)<br>
 [HyperPET pico Development Tutorial (Part2: sprites graphical objects)](https://youtu.be/8ZjlqQmJXdo?si=lpqTXvzPPhYjKBgU)<br>
+[HyperPET pico Development Tutorial (Part3: input controls, sprites collision and more)](https://youtu.be/Cvhr81-Nsuc?si=LmOhA7yWKkGvkm37)<br>
 
 <br>
 Initially the purpose of the project was to offer VGA output to the PET.<br>
