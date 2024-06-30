@@ -196,6 +196,7 @@ BULLET_ALIEN_SPID = 11
 
 ; Starfield
 STARS_NB          = (200-40)
+STAR_TIID         = 1
 
 ; Shields
 SHIELDS_Y         = ((200-40)/8)
@@ -798,12 +799,12 @@ inits1:
         jsr random
         and #$1f
         tay
-        lda #1
+        lda #STAR_TIID
         sta ($54),y
         jsr random
         and #$1f
         tay
-        lda #1
+        lda #STAR_TIID
         sta ($54),y
         clc
         lda $54
@@ -870,6 +871,8 @@ tiles0:
         lda tiles2bits_def+1,y
         sta REG_TDATA
         lda tiles2bits_def+2,y
+        sta REG_TDATA
+        lda tiles2bits_def+3,y
         sta REG_TDATA
         lda tiles2bits_def+4,y
         sta REG_TDATA
