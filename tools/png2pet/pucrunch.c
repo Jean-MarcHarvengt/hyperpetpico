@@ -1432,7 +1432,7 @@ int up_GetValue(void) {
 }
 
 
-int UnPack(int loadAddr, const unsigned char *data, const char *file,
+static int UnPack(int loadAddr, const unsigned char *data, const char *file,
 	   int flags) {
     long size, startEsc, endAddr, execAddr, headerSize;
     long startAddr, error = 0;
@@ -2909,7 +2909,7 @@ errorexit:
 
 
 
-int main(int argc, char *argv[]) {
+int pucrunch(int argc, char *argv[]) {
     int n, execAddr = -1, ea = -1, newlen, startAddr = -1, startEscape;
     int flags = F_2MHZ, lzlen = -1, buflen;
     char *fileIn = NULL, *fileOut = NULL;
@@ -3296,6 +3296,7 @@ maxrlelen = MAXRLELEN;
 	break;
     case 0:
 	type |= 0;
+	type |= FIXF_WRAP;
 	machineTypeTxt = "Without decompressor";
 	memStart = 0x801;
 	memEnd = 0x10000;
@@ -3414,5 +3415,4 @@ errexit:
 	free(indata);
     return n;
 }
-
 

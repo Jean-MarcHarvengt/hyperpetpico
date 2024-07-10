@@ -136,16 +136,14 @@ static void __not_in_flash("write89000") write89000(uint32_t address, uint8_t va
         if (!tra_h) {
           switch (cmd) 
           {
-            /*
             case cmd_transfer_packed_tile_data:
-              pushCmdQueue({cmd_unpack_tiles});
+              pushCmdQueue({cmd_transfer_packed_tile_data,(uint8_t)0,(uint16_t)((cmd_params[0]<<8)+cmd_params[1])});
               break;
             case cmd_transfer_packed_sprite_data:
-              pushCmdQueue({cmd_unpack_sprites});
+              pushCmdQueue({cmd_transfer_packed_sprite_data,(uint8_t)0,(uint16_t)((cmd_params[0]<<8)+cmd_params[1])});
               break;
-            */  
             case cmd_transfer_packed_bitmap_data:
-              pushCmdQueue({cmd_unpack_bitmap});
+              pushCmdQueue({cmd_transfer_packed_bitmap_data,(uint8_t)0,(uint16_t)((cmd_params[0]<<8)+cmd_params[1])});
               break;
           }
         }  

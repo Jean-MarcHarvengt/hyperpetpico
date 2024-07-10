@@ -95,6 +95,8 @@ REG_LINES_L1_XSCR = $9d90
 REG_SID_BASE      = $9f00
 
 *= $0800
+        lda #2
+        sta REG_LAYERS_CFG
 
 ;xh,xl,y,wh,wl,h,w*h/packet pixels
 
@@ -132,19 +134,19 @@ REG_SID_BASE      = $9f00
 copy0:
         lda ($54),y
         sta REG_TDATA
-        clc
-        lda $54                 ; lo
-        adc #1
-        sta $54                 ; hi
-        bcc copy1
-        inc $55
+        inc $54                 ; lo
+        bne copy1
+        inc $55                 ; hi
 copy1:
         lda $55
-        cmp #>(bitmap+16384)
+        cmp #>(bitmap+16000)
         bne copy0
         lda $54
-        cmp #<(bitmap+16384)
+        cmp #<(bitmap+16000)
         bne copy0
+
+        lda #(4+2+1)
+        sta REG_LAYERS_CFG
 
         rts 
 
@@ -172,9 +174,6 @@ bitstr =  $fb         ; 1 temporary (does not need to be ZP)
 decompress:
 
 
-
-        lda #32
-        sta $8000
 
         ; Setup read pointer
         sty INPOS
@@ -414,20 +413,8 @@ putch   sta $aaaa       ; ** parameter
         inc OUTPOS      ; ZP
         bne u0
         inc OUTPOS+1    ; ZP
-u0:     rts
-
-
-eof2    lda #0
-        sta $8000
-        sta $8001        
+eof2           
         rts
-
-;putch   sta REG_TDATA
-;        inc OUTPOS      ; ZP
-;        bne u0
-;        inc OUTPOS+1    ; ZP
-;u0:     
-;        rts
 
 
 
@@ -438,8 +425,11 @@ table
         ;!byte 0,0,0,0,0,0,0,0
         ;!byte 0,0,0,0,0,0,0,0
 
-
-packed:
-!bin "starwarsquarter.cru"
+DECOMP_BUFFER_REMAINS = (16000-6923+128)
 
 bitmap:
+!fill DECOMP_BUFFER_REMAINS,0 
+packed:
+!bin "sb.cru"
+packed_end
+

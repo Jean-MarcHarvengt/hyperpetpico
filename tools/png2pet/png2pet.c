@@ -1,6 +1,11 @@
 #include "png.h"
 #include "stdio.h"
+#include "gifenc.h"
+#include "gifdecmem.h"
+#include "decrunch.h"
+#include <sys/fcntl.h>
 
+extern int pucrunch(int argc, char *argv[]);
 
 /**************************************
 * Local macros/typedef
@@ -11,6 +16,12 @@
 #define MAXROWSIZE                (1920)
 
 #define RGB332VAL(r,g,b)  ( (((r>>5)&0x7)<<5) | (((g>>5)&0x7)<<2) | (((b>>6)&0x3)) )
+
+#define MIN(A, B) ((A) < (B) ? (A) : (B))
+#define MAX(A, B) ((A) > (B) ? (A) : (B))
+
+static long wwidth  = 320;
+static long hheight = 200;
 
 static unsigned char rgbsrc[MAXROWSIZE*4];
 
@@ -32,6 +43,7 @@ static int scanerr[MAXROWSIZE*3];
 static int pal_offset;
 static int dit_initialized=0;
 
+static unsigned char output[WIN_W*WIN_H+128];
 
 /***************************************
 * Local procedures
@@ -177,6 +189,8 @@ static int dit_fs2dither(int alpha, unsigned char * ptr, int Width, int Height)
   return(0);
 }
 
+
+
 /***************************************
 * Exported procedures
 ***************************************/
@@ -208,7 +222,6 @@ int png_PlaySync(char * filename, int dstWidth, int dstHeight, void * data, int 
   int            col;
   int            ret;
   int            i;
-  unsigned short value;
   unsigned short r,g,b,a;
   unsigned char  *bufpt;
 
@@ -414,41 +427,152 @@ int png_PlaySync(char * filename, int dstWidth, int dstHeight, void * data, int 
 
 } /* end of source */
 
-static unsigned char output[WIN_W*WIN_H];
 
 /***************************************
 * Exported procedures
 ***************************************/
 int main(int argc,char *argv[])
 {
-    if (argc == 3)
+    char filename[64];
+    char filenameraw[64];    
+    if (argc == 4)
     {
-        printf("loading file %s\n", argv[1]);
-        int retval = png_PlaySync(argv[1], WIN_W,WIN_H, &output[0], 0);
+        char *p;
+        wwidth  = strtol(argv[2], &p, 10);
+        hheight = strtol(argv[3], &p, 10);
+
+        printf("conversion to %ld x %u\n", wwidth,hheight);
+        strcpy(filename,argv[1]);
+        strcat(filename, ".png");
+        printf("loading file %s\n", filename);
+        int retval = png_PlaySync(filename, wwidth,hheight, &output[0], 0);
         if (retval == 0) {
             fprintf (stderr, "Error!\n");
         }
         else {
-          FILE * fp = fopen(argv[2], "wb");
+          strcpy(filenameraw,argv[1]);
+          strcat(filenameraw, ".raw");          
+          printf("saving file %s\n", filenameraw);
+          FILE * fp = fopen(filenameraw, "wb");
           if (!fp) {
             fprintf (stderr, "Error writing file!\n");
             return 0;
           }
-          retval = fwrite(output, 1, WIN_W*WIN_H, fp );
-          if (retval != WIN_W*WIN_H) {
-            return 0;
+          retval = fwrite(output, 1, wwidth*hheight, fp );
+          if (retval != wwidth*hheight) {
             fprintf (stderr, "Error writing file!\n");
+            return 0;
           }
           fclose(fp);
-          printf("file converted \n");
+     
+          /* create a GIF */
+          strcpy(filename,argv[1]);
+          strcat(filename, ".gif");    
+          printf("encoding to gif\n");
+          ge_GIF *gife = ge_new_gif(
+              filename,       /* file name */
+              wwidth, hheight,  /* canvas size */
+              NULL,           /* default palette */
+              8,              /* palette depth == log2(# of colors) */
+              -1,             /* no transparency */
+              0               /* infinite loop */
+          );
+          for (int j = 0; j < wwidth*hheight; j++) {
+            gife->frame[j] = output[j];
+          }
+          ge_add_frame(gife, 0);
+          ge_close_gif(gife);
+          printf("file converted\n");
+
+          char * argvl[5] = {"./pucrunch", "-c0", "-d", NULL, NULL};
+          printf("encoding to cru\n");
+          strcpy(filename,argv[1]);
+          strcat(filename, ".cru");
+          argvl[3] = filenameraw;
+          argvl[4] = filename;
+          pucrunch(5, argvl);
+          printf("file converted\n");
+
+          memset(&output[0],sizeof(output),0);
+          printf("decoding cru (verifying)\n");
+          printf("read cru file in memory %s\n", filename);
+          FILE * fpr = fopen(filename, "rb");
+          if (!fpr) {
+            fprintf (stderr, "Error reading file!\n");
+            return 0;
+          }
+          fseek(fpr, 0L, SEEK_END);
+          int crusz = ftell(fpr);
+          fseek(fpr, 0L, SEEK_SET);
+          printf("cru size = %d\n", crusz);
+          uint8_t * input = &output[sizeof(output)-crusz];
+          fread(input, 1, crusz, fpr );
+          fclose(fpr);
+
+          UnPack(0, &output[sizeof(output)-crusz], &output[0], sizeof(output)-128);
+
+          strcpy(filename,argv[1]);
+          strcat(filename, ".raw2");          
+          printf("saving decoded cru as raw2  %s\n", filename);
+          fp = fopen(filename, "wb");
+          if (!fp) {
+            fprintf (stderr, "Error writing file!\n");
+            return 0;
+          }
+          int retval = fwrite(output, 1, wwidth*hheight, fp );
+          if (retval != wwidth*hheight) {
+            fprintf (stderr, "Error writing file!\n");
+            return 0;
+          }
+          fclose(fp);
+
+/*
+          strcpy(filename,argv[1]);
+          strcat(filename, ".gif"); 
+          printf("decoding gif (verifying)\n");
+          printf("read gif file in memory %s\n", filename);
+          FILE * fpr = fopen(filename, "rb");
+          if (!fpr) {
+            fprintf (stderr, "Error reading file!\n");
+            return 0;
+          }
+
+          fseek(fpr, 0L, SEEK_END);
+          int gifsz = ftell(fpr);
+          fseek(fpr, 0L, SEEK_SET);
+          printf("gif size = %d\n", gifsz);
+          uint8_t * input = &output[wwidth*hheight-gifsz+128]; // ? 256
+          fread(input, 1, gifsz, fpr );
+          fclose(fpr);
+
+          gd_GIF gifd;
+          int ret = decode_gif(&gifd, input, output);
+          if (ret != 0)  { 
+              printf("error decoding gif\n");
+              return -1;
+          }      
+          strcpy(filename,argv[1]);
+          strcat(filename, ".raw3");          
+          printf("saving decoded gif as raw2  %s\n", filename);
+          fp = fopen(filename, "wb");
+          if (!fp) {
+            fprintf (stderr, "Error writing file!\n");
+            return 0;
+          }
+          int retval = fwrite(output, 1, wwidth*WIN_H, fp );
+          if (retval != wwidth*WIN_H) {
+            fprintf (stderr, "Error writing file!\n");
+            return 0;
+          }
+          fclose(fp);
+*/          
         }
     }
     else {
-          printf("Invalid params: conv input.png output.raw\n");
-    
+          printf("Invalid params: png2pet image(wo '.png') XRES YRES\n");    
     }
-    
-    return 1;	
+
+    return 0;	
 }
 
 

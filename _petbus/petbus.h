@@ -278,9 +278,7 @@ typedef enum {
   cmd_transfer_packed_tile_data=6,
   cmd_transfer_packed_sprite_data=7,
   cmd_transfer_packed_bitmap_data=8,
-  cmd_unpack_tiles=9,
-  cmd_unpack_sprites=10,
-  cmd_unpack_bitmap=11,
+  
   cmd_bitmap_clr=12,
   cmd_bitmap_point=13,
   cmd_bitmap_rect=14,
@@ -289,7 +287,7 @@ typedef enum {
   cmd_readfile=28,
   cmd_opendir=29,
   cmd_readdir=30,
-  cmd_a000_bank=31,
+  cmd_unused=31,
 } Cmd;
 
 

@@ -89,6 +89,9 @@ extern "C" void hid_app_task(void);
 #define FONTH 8                       // Font height
 #define FONT_SIZE (FONTW*FONTH)
 
+// Others
+#define GFX_MARGIN     128
+
 // Video configurations
 static sVmode Vmode0; // videomode setup
 static sVgaCfg Cfg0;  // required configuration
@@ -104,7 +107,7 @@ static u16 screen_height = 200;
 static u16 screen_width;
 
 // Frame buffer
-static ALIGNED u8 Bitmap[LO_XRES*MAXHEIGHT];
+static ALIGNED u8 Bitmap[LO_XRES*MAXHEIGHT+GFX_MARGIN];
 // Sprites
 struct Sprite {
    u8  y;
@@ -130,10 +133,10 @@ static u16 SpriteIdToDataIndex[SPRITE_NBTILES];
 static u16 SpriteDataIndex=0;
 
 // Sprite definition
-static ALIGNED u8 SpriteData[SPRITE_SIZE*SPRITE_NBTILES];
+static ALIGNED u8 SpriteData[SPRITE_SIZE*SPRITE_NBTILES+GFX_MARGIN];
 
 // Tile definition
-static ALIGNED u8 TileData[TILE_MAXDATA];
+static ALIGNED u8 TileData[TILE_MAXDATA+GFX_MARGIN];
 
 // Reset
 static bool pet_reset = false;
@@ -772,16 +775,16 @@ static void handleCmdQueue(void) {
     QueueItem cmd = cmd_queue[cmd_queue_rd];
     cmd_queue_rd = (cmd_queue_rd + 1)&(CMD_QUEUE_SIZE-1);
     cmd_queue_cnt--;
-    switch (cmd.id) {
-      case cmd_unpack_tiles:
-        UnPack(0, &Bitmap[0], &TileData[0], sizeof(TileData));
+    switch (cmd.id) {     
+      case cmd_transfer_packed_tile_data:
+        UnPack(0, &TileData[sizeof(TileData)-cmd.p16_1], &TileData[0], sizeof(TileData)-GFX_MARGIN);
         break;
-      case cmd_unpack_sprites:
-        UnPack(0, &Bitmap[0], &SpriteData[0], sizeof(SpriteData));
+      case cmd_transfer_packed_sprite_data:
+        UnPack(0, &SpriteData[sizeof(SpriteData)-cmd.p16_1], &SpriteData[0], sizeof(SpriteData)-GFX_MARGIN);
         break;
-      case cmd_unpack_bitmap:
-        UnPack(0, &TileData[0], &Bitmap[0], sizeof(Bitmap));
-        break;
+      case cmd_transfer_packed_bitmap_data:
+        UnPack(0, &Bitmap[sizeof(Bitmap)-cmd.p16_1], &Bitmap[0], sizeof(Bitmap)-GFX_MARGIN);
+        break;      
       case cmd_bitmap_clr:
         memset((void*)&Bitmap[0],0, sizeof(Bitmap));
         break;
@@ -904,9 +907,7 @@ static void handleCmdQueue(void) {
           }
         }
         mem[REG_TLOOKUP] = nbFiles;
-        break;
-      case cmd_a000_bank:
-        break;        
+        break;     
       default:
         break;
     }
@@ -917,6 +918,7 @@ static void handleCmdQueue(void) {
 void __not_in_flash("pushCmdQueue") pushCmdQueue(QueueItem cmd ) {
   if (cmd_queue_cnt != 256)
   {
+    mem[REG_TSTATUS] = 1;     
     cmd_queue[cmd_queue_wr] = cmd;
     cmd_queue_wr = (cmd_queue_wr + 1)&(CMD_QUEUE_SIZE-1);
     cmd_queue_cnt++;
@@ -933,9 +935,7 @@ uint8_t __not_in_flash("cmd_params_len") cmd_params_len[MAX_CMD]={
 //       6:  transfer all tile 8bits data compressed (data=sizeh,sizel,pixels)
 //       7:  transfer all sprite 8bits data compressed (data=sizeh,sizel,pixels)
 //       8:  transfer bitmap 8bits data compressed (data=sizeh,sizel,pixels)  
-//       9:  unpack tiles   
-//       10: unpack sprites   
-//       11: unpack bitmap
+
 //       12: bitmap clr
 //       13: bitmap point
 //       14: bitmap tri
@@ -944,9 +944,9 @@ uint8_t __not_in_flash("cmd_params_len") cmd_params_len[MAX_CMD]={
 //       28  readfile
 //       29  opendir
 //       30  readdir
-//       31  a000_bank                (data=bank#)
+//       31  unused
  
-  0,3,3,6,4,4,2,2,2, 0,0,0, 0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1
+  0,3,3,6,4,4,2,2,2, 0,0,0, 0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0
 }; 
 
 static void __not_in_flash("traParamFuncDummy") traParamFuncDummy(void) {
@@ -1001,39 +1001,29 @@ static void __not_in_flash("traParamFuncTmaprow") traParamFuncTmaprow(void) {
 
 static void __not_in_flash("traParamFuncPackedTiles") traParamFuncPackedTiles(void) {
   tra_h = (cmd_params[0]<<8)+cmd_params[1];
-  tra_x = 0; //sizeof(TileData)-tra_h;
-  tra_w = tra_h;
-  tra_address = &Bitmap[0];
-}
-
-static void __not_in_flash("traParamFuncPackedSprites") traParamFuncPackedSprites(void) {
-  tra_h = (cmd_params[0]<<8)+cmd_params[1];
-  tra_x = 0; //sizeof(SpriteData)-tra_h;
-  tra_w = tra_h;
-  tra_address = &Bitmap[0];
-}
-
-static void __not_in_flash("traParamFuncPackedBitmap") traParamFuncPackedBitmap(void) {
-  tra_h = (cmd_params[0]<<8)+cmd_params[1];
-  tra_x = 0; //sizeof(Bitmap)-tra_h;
+  tra_x = sizeof(TileData)-tra_h;
   tra_w = tra_h;
   tra_address = &TileData[0];
 }
 
+static void __not_in_flash("traParamFuncPackedSprites") traParamFuncPackedSprites(void) {
+  tra_h = (cmd_params[0]<<8)+cmd_params[1];
+  tra_x = sizeof(SpriteData)-tra_h;
+  tra_w = tra_h;
+  tra_address = &SpriteData[0];
+}
 
+static void __not_in_flash("traParamFuncPackedBitmap") traParamFuncPackedBitmap(void) {
+  tra_h = (cmd_params[0]<<8)+cmd_params[1];
+  tra_x = sizeof(Bitmap)-tra_h;
+  tra_w = tra_h;
+  tra_address = &Bitmap[0];
+}
 
 static void __not_in_flash("traParamFuncExecuteCommand") traParamFuncExecuteCommand(void) {
-  mem[REG_TSTATUS] = 1; 
-/*
-    case cmd_transfer_packed_tile_data:
-      pushCmdQueue({cmd_unpack_tiles});
-      break;
-    case cmd_transfer_packed_sprite_data:
-      pushCmdQueue({cmd_unpack_sprites});
-      break;
-*/      
   if (cmd_queue_cnt != 256)
   {
+    mem[REG_TSTATUS] = 1;     
     cmd_queue[cmd_queue_wr] = {cmd};
     cmd_queue_wr = (cmd_queue_wr + 1)&(CMD_QUEUE_SIZE-1);
     cmd_queue_cnt++;
@@ -1041,9 +1031,9 @@ static void __not_in_flash("traParamFuncExecuteCommand") traParamFuncExecuteComm
 }
 
 static void __not_in_flash("traParamFuncExecuteCommand1") traParamFuncExecuteCommand1(void) {
-  mem[REG_TSTATUS] = 1; 
   if (cmd_queue_cnt != 256)
   {
+    mem[REG_TSTATUS] = 1; 
     cmd_queue[cmd_queue_wr] = {cmd,cmd_params[0]};
     cmd_queue_wr = (cmd_queue_wr + 1)&(CMD_QUEUE_SIZE-1);
     cmd_queue_cnt++;
@@ -1064,27 +1054,27 @@ void __not_in_flash("traParamFuncPtr") (*traParamFuncPtr[MAX_CMD])(void) = {
   traParamFuncDummy,
   traParamFuncDummy,
   traParamFuncDummy,
-  traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand,
+  traParamFuncDummy,
+  traParamFuncDummy,
+  traParamFuncDummy,
+  traParamFuncDummy,
   
-  traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand,
+  traParamFuncDummy,
+  traParamFuncDummy,
+  traParamFuncDummy,
+  traParamFuncDummy,
+  traParamFuncDummy,
+  traParamFuncDummy,
+  traParamFuncDummy,
+  traParamFuncDummy,
+  traParamFuncDummy,
+  traParamFuncDummy,
+  traParamFuncDummy,
   traParamFuncExecuteCommand1,
   traParamFuncExecuteCommand,
   traParamFuncExecuteCommand,
   traParamFuncExecuteCommand,
-  traParamFuncExecuteCommand1
+  traParamFuncDummy
 };
 
 static void __not_in_flash("traDataFunc8nolut") traDataFunc8nolut(uint8_t val) {
@@ -1191,14 +1181,14 @@ static void __not_in_flash("handle_custom_registers") handle_custom_registers(ui
           switch (cmd) 
           {
             case cmd_transfer_packed_tile_data:
-              pushCmdQueue({cmd_unpack_tiles});
+              pushCmdQueue({cmd_transfer_packed_tile_data,(uint8_t)0,(uint16_t)((cmd_params[0]<<8)+cmd_params[1])});
               break;
             case cmd_transfer_packed_sprite_data:
-              pushCmdQueue({cmd_unpack_sprites});
+              pushCmdQueue({cmd_transfer_packed_sprite_data,(uint8_t)0,(uint16_t)((cmd_params[0]<<8)+cmd_params[1])});
               break;
             case cmd_transfer_packed_bitmap_data:
-              pushCmdQueue({cmd_unpack_bitmap});
-              break;  
+              pushCmdQueue({cmd_transfer_packed_bitmap_data,(uint8_t)0,(uint16_t)((cmd_params[0]<<8)+cmd_params[1])});
+              break;
           }
         }  
       }   

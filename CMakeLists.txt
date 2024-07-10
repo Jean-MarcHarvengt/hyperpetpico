@@ -23,7 +23,7 @@ include_directories(_petemu)
 include_directories(_petbus)
 include_directories(_network)
 include_directories(_usb_kbd)
-include_directories(_pucrunch)
+include_directories(_decomp)
 include_directories(_flashfs)
 include_directories(_flashfs/fatfs)
 
@@ -80,8 +80,8 @@ set(USB_SOURCES
 	)
 endif()
 
-set(PUCRUNCH_SOURCES 	
-		_pucrunch/decrunch.c
+set(DECOMP_SOURCES 	
+		_decomp/decrunch.c
 	)
 
 set(FF_SOURCES
@@ -100,7 +100,7 @@ add_executable(${TARGET}
 		${SID_SOURCES}
 		${PETEMU_SOURCES}
 		${PETBUS_SOURCES}
-		${PUCRUNCH_SOURCES}		
+		${DECOMP_SOURCES}		
 		${NETWORK_SOURCES}
 		${FF_SOURCES}
 		${USB_SOURCES}
