@@ -1,4 +1,6 @@
-!to "sk.prg"
+
+
+!to "font.prg"
 
 
 *= $0401
@@ -9,8 +11,6 @@
         !text "2048"
         !byte $00
 bas_end !word $00
-
-
 
 ; Graphics
 ; tiles/text map
@@ -170,11 +170,40 @@ JOY_RIGHT         = (8)
 JOY_FIRE          = (1+2)
 
 
-;--------------------------------------------------------
 *= $0800
 
+        lda #9                  ; command = transfer font data
+        sta REG_TCOMMAND
+        lda #>(font_end-font)
+        sta REG_TPARAMS
+        lda #<(font_end-font)
+        sta REG_TPARAMS
 
-WAIT_KEY
-        jsr $FFE4        ; Calling KERNAL GETIN 
-        beq WAIT_KEY
-        rts
+        lda #<font              ; lo
+        sta $54
+        lda #>font              ; hi
+        sta $55
+        ldy #$00
+copy0:
+        lda ($54),y
+        sta REG_TDATA
+        inc $54                 ; lo             
+        bne copy1
+        inc $55                 ; hi
+copy1:
+        lda $55
+        cmp #>(font_end)
+        bne copy0
+        lda $54
+        cmp #<(font_end)
+        bne copy0
+
+        rts 
+
+
+
+
+
+font:
+!bin "gc.fnt"
+font_end:

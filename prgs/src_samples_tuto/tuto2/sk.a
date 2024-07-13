@@ -114,6 +114,7 @@ REG_TCOMMAND      = $9b11
 ; 6: transfer all tile 8bits data compressed (data=sizeh,sizel,pixels)
 ; 7: transfer all sprite 8bits data compressed (data=sizeh,sizel,pixels)
 ; 8: transfer bitmap 8bits data compressed (data=sizeh,sizel,pixels)
+; 9: transfer font 1bit data, 8bits a time (data=sizeh,sizel,pixels)  
 
 REG_TPARAMS       = $9b12
 ; WR

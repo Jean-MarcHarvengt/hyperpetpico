@@ -13,16 +13,23 @@
 bas_end !word $00
 
 ; Graphics
-; tile/text map
+; tiles/text map
 REG_TEXTMAP_L1    = $8000
 REG_TILEMAP_L1    = $8800
 REG_TILEMAP_L0    = $9000
+; tile id 0-255 in 8x8   tile mode
+; tile id 0-63  in 16x16 tile mode
 
-; sprite
+; sprites (96 max) in L2
+NB_SPRITES_MAX    = 96
+
 REG_SPRITE_IND    = $9800
 REG_SPRITE_XHI    = $9880
 REG_SPRITE_XLO    = $9900
 REG_SPRITE_Y      = $9980
+; id:    0-5 (max 63)
+; hflip: 6
+; vflip: 7
 
 ; mode
 REG_VIDEO_MODE    = $9b00
@@ -33,66 +40,106 @@ REG_BG_COL        = $9b01
 ; RGB332
 REG_FG_COL        = $9b0d
 ; RGB332
+; R: 5-7, 0x20 -> 0xe0   xxx --- --
+; G: 2-4, 0x04 -> 0x1c   --- xxx -- 
+; B: 0-1, 0x00 -> 0x03   --- --- xx  
 
 ; layers config
 REG_LAYERS_CFG    = $9b02
-; 0: L0 on/off
-; 1: L1 on/off    (off if HIRES and bitmap in L0!)
-; 2: L2 on/off
-; 3: L2 inbetween
-; 4: bitmap/tile in L0
-; 5: petfont/tile in L1
+; 0: L0 on/off (1=on)
+; 1: L1 on/off (1=on)    (off if HIRES and bitmap in L0!)
+; 2: L2 on/off (1=on)
+; 3: L2 inbetween (0 = sprites top)
+; 4: bitmap/tile in L0 (0=bitmap)
+; 5: petfont/tile in L1 (0=petfont)
 ; 6: enable scroll area in L0
 ; 7: enable scroll area in L1
+
+; tiles config
+REG_TILES_CFG     = $9b0e
+; 0: L0: 0=8x8, 1=16x16
+; 1: L1: 0=8x8, 1=16x16
+; 2-4: xcurtain
+;      0: on/off
+;      1: 8/16 pixels left
+; 5-7: ycurtain
+;      0: on/off
+;      1: 8/16 pixels top
 
 ; lines config
 REG_LINES_CFG     = $9b03
 ; 0: single/perline background color
 ; 1: single/perline L0 xscroll
 ; 2: single/perline L1 xscroll
-REG_TILES_CFG     = $9b0e
-; 0: 0=8x8tile, 1=16x16tiles
 
 ; layer scroll
 REG_XSCROLL_HI    = $9b04
-; 3-0: L0 xscroll hi
-; 7-4: L1 xscroll hi
+; 3-0: L0 xscroll HI
+; 7-4: L1 xscroll HI
 REG_XSCROLL_L0    = $9b05
 REG_XSCROLL_L1    = $9b06
 REG_YSCROLL_L0    = $9b07
 REG_YSCROLL_L1    = $9b08
+; 7-0, in pixels
 ; scroll area
 REG_SC_START_L0   = $9b09
 REG_SC_END_L0     = $9b0a
 REG_SC_START_L1   = $9b0b
 REG_SC_END_L1     = $9b0c
-; 4-0
+; 4-0, in tiles/characters
 
-; tiles config
-REG_TILES_CFG     = $9b0e
-; 0: L0: 0=8x8, 1=16x16
-; 1: L1: 0=8x8, 1=16x16
-; 2-4: xcurtain left
-;  0: on/off
-;  1: 8/16 pixels
-; 5-7: ycurtain top
-;  0: on/off
-;  1: 8/16 pixels
 
+; vsync line (0-200, 200 is overscan) (RD)
+REG_VSYNC         = $9b0f
+;
 ; data transfer
 REG_TLOOKUP       = $9a00
+; used as RGB332 LUT for pixels (palette) (WR)
+; also used as 256 scratch buffer for other commands (WR/RD) 
+
 REG_TDEPTH        = $9b10
+; WR
 ; 1/2/4/8 bits per pixel (using indexed CLUT)
 ; 9 = 8 bits RGB332 no CLUT
 ; 0 = compressed
+
 REG_TCOMMAND      = $9b11
+; WR
+; 0: idle
 ; 1: transfer tiles data      (data=tilenr,w,h,packet pixels)
 ; 2: transfer sprites data    (data=spritenr,w,h,packet pixels)
 ; 3: transfer bitmap data     (data=xh,xl,y,wh,wl,h,w*h/packet pixels) 
 ; 4: transfer t/fmap col data (data=layer,col,row,size,size/packet tiles)
 ; 5: transfer t/fmap row data (data=layer,col,row,size,size/packet tiles)
+; 6: transfer all tile 8bits data compressed (data=sizeh,sizel,pixels)
+; 7: transfer all sprite 8bits data compressed (data=sizeh,sizel,pixels)
+; 8: transfer bitmap 8bits data compressed (data=sizeh,sizel,pixels)
+; 9: transfer font 1bit data, 8bits a time (data=sizeh,sizel,pixels)  
+
 REG_TPARAMS       = $9b12
+; WR
+
 REG_TDATA         = $9b13
+; WR
+
+REG_TSTATUS       = $9b14
+; transfer status (RD) 1=ready for async commands only
+
+; Redefining tiles/sprite sequence
+; 1. write lookup palette entries needed
+; 2. write transfer mode (1/2/4/8/9)
+; 3. write command 1/2
+; 4. write params tile/sprite id,w,h
+; 5. write data sequence (8bytes*plane for tiles, (h*2)bytes*plane for sprites)
+; (any new command to reset)
+;
+; Transfer bitmap sequence
+; 1. write lookup palette entries needed
+; 2. write transfer mode (1/2/4/8/9)
+; 3. write command 3
+; 4. write params XH,XL,Y,WH,WL,H
+; 5. write data sequence (bytes*plane /packed_bits)
+; (any new command to reset)
 
 ; lines background color / scroll (200 values)
 REG_LINES_BG_COL  = $9b38
@@ -101,10 +148,27 @@ REG_LINES_XSCR_HI = $9c00
 ; 7-4:  lines L1 xscroll hi, 3-0: L0 xscroll hi
 REG_LINES_L0_XSCR = $9cc8
 REG_LINES_L1_XSCR = $9d90
-
+;
+; Sprite collision
+; only for first 16 sprites against all the rest (96) 
+; LO (8bits x 96 entries, first 8 sprites, bit0 = sprite 0) 
+; HI (8bits x 96 entries, last  8 sprites, bit0 = sprite 8)
+REG_SPRITE_COL_LO = $9f00 
+REG_SPRITE_COL_HI = $9f80
+;
 ; Audio
 ; SID (see C64)
 REG_SID_BASE      = $9f00
+
+REG_JOYSTICK      = $e84f
+
+; Joystick macros
+JOY_UP            = (1)
+JOY_DOWN          = (2)
+JOY_LEFT          = (4)
+JOY_RIGHT         = (8) 
+JOY_FIRE          = (1+2)
+
 
 *= $0800
         lda #2
@@ -128,12 +192,9 @@ REG_SID_BASE      = $9f00
 copy0:
         lda ($54),y
         sta REG_TDATA
-        clc
-        lda $54                 ; lo
-        adc #1
-        sta $54                 ; hi
-        bcc copy1
-        inc $55
+        inc $54                 ; lo             
+        bne copy1
+        inc $55                 ; hi
 copy1:
         lda $55
         cmp #>(bitmap_end)

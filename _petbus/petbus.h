@@ -101,6 +101,7 @@
 //       6: transfer all tile 8bits data compressed (data=sizeh,sizel,pixels)
 //       7: transfer all sprite 8bits data compressed (data=sizeh,sizel,pixels)
 //       8: transfer bitmap 8bits data compressed (data=sizeh,sizel,pixels)
+//       9: transfer font 1bit data, 8bits a time (data=sizeh,sizel,pixels)  
 //
 // 9b12: transfer params (WR)
 // 9b13: transfer data   (RD/WR)
@@ -278,11 +279,14 @@ typedef enum {
   cmd_transfer_packed_tile_data=6,
   cmd_transfer_packed_sprite_data=7,
   cmd_transfer_packed_bitmap_data=8,
-  
+  cmd_transfer_font=9,
+
+  cmd_tiles_clr=11,
   cmd_bitmap_clr=12,
   cmd_bitmap_point=13,
   cmd_bitmap_rect=14,
   cmd_bitmap_tri=15,
+  
   cmd_openfile=27,
   cmd_readfile=28,
   cmd_opendir=29,

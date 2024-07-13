@@ -87,7 +87,7 @@ extern "C" void hid_app_task(void);
 // Font
 #define FONTW 8                       // Font width
 #define FONTH 8                       // Font height
-#define FONT_SIZE (FONTW*FONTH)
+#define FONT_SIZE (2*2048)            // Dual font upper and lower case
 
 // Others
 #define GFX_MARGIN     128
@@ -137,6 +137,9 @@ static ALIGNED u8 SpriteData[SPRITE_SIZE*SPRITE_NBTILES+GFX_MARGIN];
 
 // Tile definition
 static ALIGNED u8 TileData[TILE_MAXDATA+GFX_MARGIN];
+
+// Font definition (dual upper and lower case)
+static unsigned char font[FONT_SIZE];
 
 // Reset
 static bool pet_reset = false;
@@ -573,7 +576,7 @@ void __not_in_flash("VideoRenderLineL1") VideoRenderLineL1(u8 * linebuffer, int 
       {
         u8 fgcolor = GET_FG_COL;
         unsigned char * charpt = &mem[(scanline>>3)*(screen_width/FONTW)+REG_TEXTMAP_L1];    
-        unsigned char * fontpt = &petfont[(scanline&0x7)+(font_lowercase?0x800:0x000)];
+        unsigned char * fontpt = &font[(scanline&0x7)+(font_lowercase?0x800:0x000)];
         int scroll = L1_XSCR_LINE_ENA?GET_XSCROLL_L1+( mem[REG_LINES_L1_XSCR+scanline] | ((mem[REG_LINES_XSCR_HI+scanline] & 0xf0)<<4) ):GET_XSCROLL_L1;
         int screen_width_in_chars = screen_width >> 3;
         if (screen_width_in_chars == 32) { 
@@ -620,6 +623,11 @@ void __not_in_flash("VideoRenderLineL1") VideoRenderLineL1(u8 * linebuffer, int 
 
 static void VideoRenderInit(void)
 {
+  // A000 area content is file browser default
+#ifdef PETIO_A000
+  memcpy((void *)&mem_a000[0], (void *)fb, sizeof(fb));
+#endif 
+
   // initialize shared memory but preserve freq (only if PETIO_EDIT is enabled)
   uint8_t palntsc = mem[REG_PALNTSC];
   memset((void*)&mem[0x0000], 0, 0x2000); // all registers and videomem
@@ -628,9 +636,8 @@ static void VideoRenderInit(void)
   // initialize GFX memory (bitmap,sprites,tiles)
   ResetGFXMem();
   
-#ifdef PETIO_A000
-  memcpy((void *)&mem_a000[0], (void *)fb, sizeof(fb));
-#endif 
+  // Font
+  memcpy((void *)&font[0], (void *)&petfont[0], sizeof(petfont));
 
   // prepare sprites
   for (int i = 0; i < SPRITE_NUM_MAX; i++)
@@ -785,6 +792,9 @@ static void handleCmdQueue(void) {
       case cmd_transfer_packed_bitmap_data:
         UnPack(0, &Bitmap[sizeof(Bitmap)-cmd.p16_1], &Bitmap[0], sizeof(Bitmap)-GFX_MARGIN);
         break;      
+      case cmd_tiles_clr:
+        memset((void*)&TileData[0],0, sizeof(TileData));
+        break;
       case cmd_bitmap_clr:
         memset((void*)&Bitmap[0],0, sizeof(Bitmap));
         break;
@@ -926,16 +936,18 @@ void __not_in_flash("pushCmdQueue") pushCmdQueue(QueueItem cmd ) {
 }
 
 uint8_t __not_in_flash("cmd_params_len") cmd_params_len[MAX_CMD]={ 
-//       0:  idle
-//       1:  transfer tiles data      (data=tilenr,w,h,packet pixels)
-//       2:  transfer sprites data    (data=spritenr,w,h,packet pixels)
-//       3:  transfer bitmap data     (data=xh,xl,y,wh,wl,h,w*h/packet pixels) 
-//       4:  transfer t/fmap col data (data=layer,col,row,size,size/packet tiles)
-//       5:  transfer t/fmap row data (data=layer,col,row,size,size/packet tiles)
-//       6:  transfer all tile 8bits data compressed (data=sizeh,sizel,pixels)
-//       7:  transfer all sprite 8bits data compressed (data=sizeh,sizel,pixels)
-//       8:  transfer bitmap 8bits data compressed (data=sizeh,sizel,pixels)  
+//       0: idle
+//       1: transfer tiles data      (data=tilenr,w,h,packet pixels)
+//       2: transfer sprites data    (data=spritenr,w,h,packet pixels)
+//       3: transfer bitmap data     (data=xh,xl,y,wh,wl,h,w*h/packet pixels) 
+//       4: transfer t/fmap col data (data=layer,col,row,size,size/packet tiles)
+//       5: transfer t/fmap row data (data=layer,col,row,size,size/packet tiles)
+//       6: transfer all tile 8bits data compressed (data=sizeh,sizel,pixels)
+//       7: transfer all sprite 8bits data compressed (data=sizeh,sizel,pixels)
+//       8: transfer bitmap 8bits data compressed (data=sizeh,sizel,pixels)  
+//       9: transfer font 1bit data, 8bits a time (data=sizeh,sizel,pixels)  
 
+//       11: tiles clr
 //       12: bitmap clr
 //       13: bitmap point
 //       14: bitmap tri
@@ -946,7 +958,7 @@ uint8_t __not_in_flash("cmd_params_len") cmd_params_len[MAX_CMD]={
 //       30  readdir
 //       31  unused
  
-  0,3,3,6,4,4,2,2,2, 0,0,0, 0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0
+  0,3,3,6,4,4,2,2,2, 2,0,0, 0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0
 }; 
 
 static void __not_in_flash("traParamFuncDummy") traParamFuncDummy(void) {
@@ -1020,6 +1032,14 @@ static void __not_in_flash("traParamFuncPackedBitmap") traParamFuncPackedBitmap(
   tra_address = &Bitmap[0];
 }
 
+static void __not_in_flash("traParamFuncFont") traParamFuncFont(void) {
+  tra_h = (cmd_params[0]<<8)+cmd_params[1];
+  tra_x = 0;
+  tra_w = tra_h;
+  tra_address = &font[(font_lowercase?0x800:0x000)];
+  cmd_tra_depth = 0; // 1 byte to 1 byte (1bit data, 8 pixels at a time)
+}
+
 static void __not_in_flash("traParamFuncExecuteCommand") traParamFuncExecuteCommand(void) {
   if (cmd_queue_cnt != 256)
   {
@@ -1051,10 +1071,10 @@ void __not_in_flash("traParamFuncPtr") (*traParamFuncPtr[MAX_CMD])(void) = {
   traParamFuncPackedTiles,
   traParamFuncPackedSprites,
   traParamFuncPackedBitmap,
+  traParamFuncFont,
   traParamFuncDummy,
-  traParamFuncDummy,
-  traParamFuncDummy,
-  traParamFuncDummy,
+  traParamFuncExecuteCommand,
+  traParamFuncExecuteCommand,
   traParamFuncDummy,
   traParamFuncDummy,
   traParamFuncDummy,
