@@ -1,5 +1,8 @@
 #include "png.h"
 #include "stdio.h"
+#include "math.h"
+#include "string.h"
+#include "stdlib.h"
 #include "gifenc.h"
 #include "gifdecmem.h"
 #include "decrunch.h"

@@ -226,6 +226,18 @@ SHIELDS_FIRST_TID = $42
         jsr program_tiles       ; transfer sprites definition to pico
 
 
+        lda #0+2+1+0+32         ; hide sprite layer (L2), show L1 (tiles) and L0 (bitmap)
+        sta REG_LAYERS_CFG
+
+        lda #<title_lines
+        sta $54
+        lda #>title_lines
+        sta $55
+        jsr print  
+        jsr show_title_bmp
+        
+        jsr press_space
+
 
 loop_title:                     ; show title screen       
         lda #0+2+1+0+32         ; hide sprite layer (L2), show L1 (tiles) and L0 (bitmap)
@@ -957,16 +969,16 @@ show_title_bmp:
         sta REG_TDEPTH
         lda #8                  ; command = transfer packed bitmap
         sta REG_TCOMMAND
-;        lda #>(title_bitmap_end-title_bitmap)
-;        sta REG_TPARAMS
-;        lda #<(title_bitmap_end-title_bitmap)
-;        sta REG_TPARAMS
+        lda #>(title_bitmap_end-title_bitmap)
+        sta REG_TPARAMS
+        lda #<(title_bitmap_end-title_bitmap)
+        sta REG_TPARAMS
 
 
-;        lda #<title_bitmap       ; lo
-;        sta $54
-;        lda #>title_bitmap       ; hi
-;        sta $55
+        lda #<title_bitmap       ; lo
+        sta $54
+        lda #>title_bitmap       ; hi
+        sta $55
         ldy #$00
 show0:
         lda ($54),y
@@ -976,11 +988,11 @@ show0:
         inc $55
 show1:
         lda $55
-;        cmp #>(title_bitmap_end)
-;        bne show0
-;        lda $54
-;        cmp #<(title_bitmap_end)
-;        bne show0
+        cmp #>(title_bitmap_end)
+        bne show0
+        lda $54
+        cmp #<(title_bitmap_end)
+        bne show0
         jsr wait_command_done        
         rts
 
@@ -990,15 +1002,15 @@ show_game_bmp:
         sta REG_TDEPTH
         lda #8                  ; command = transfer packed bitmap
         sta REG_TCOMMAND
-;        lda #>(game_bitmap_end-game_bitmap)
-;        sta REG_TPARAMS
-;        lda #<(game_bitmap_end-game_bitmap)
-;        sta REG_TPARAMS
+        lda #>(game_bitmap_end-game_bitmap)
+        sta REG_TPARAMS
+        lda #<(game_bitmap_end-game_bitmap)
+        sta REG_TPARAMS
 
-;        lda #<game_bitmap       ; lo
-;        sta $54
-;        lda #>game_bitmap       ; hi
-;        sta $55
+        lda #<game_bitmap       ; lo
+        sta $54
+        lda #>game_bitmap       ; hi
+        sta $55
         ldy #$00
 show2:
         lda ($54),y
@@ -1007,11 +1019,11 @@ show2:
         bne show3
         inc $55
 show3:
-;        lda $55
-;        cmp #>(game_bitmap_end)
-;        bne show2
-;        lda $54
-;        cmp #<(game_bitmap_end)
+        lda $55
+        cmp #>(game_bitmap_end)
+        bne show2
+        lda $54
+        cmp #<(game_bitmap_end)
         bne show2
         jsr wait_command_done
         rts
@@ -1183,6 +1195,45 @@ linehi:
 
 ;-------------------------------------------------------------
 program_tiles:
+        lda #1                  ; font (32chars): transfer depth: 1 bit clut
+        sta REG_TDEPTH
+
+        lda #<font              ; lo
+        sta $54
+        lda #>font              ; hi
+        sta $55
+
+        ldx #0
+font0:        
+        lda #1                  ; command = transfer font data
+        sta REG_TCOMMAND
+        txa
+        sta REG_TPARAMS         ; tile id
+        lda #8                  
+        sta REG_TPARAMS         ; width
+        sta REG_TPARAMS         ; height
+        ldy #$00
+font1:
+        lda ($54),y
+        sta REG_TDATA
+        iny
+        cpy #8
+        bne font1
+        clc
+        lda $54                 ; lo             
+        adc #8
+        sta $54 
+        bcc font2        
+        inc $55                 ; hi
+font2:
+        inx
+        lda $55
+        cmp #>(font_end)
+        bne font0
+        lda $54
+        cmp #<(font_end)
+        bne font0
+
 
 
         lda #2                  ; 2 tiles: transfer depth: 2 bit clut
@@ -1247,7 +1298,7 @@ tiles0:
         cpx #$40+2
         bne tiles0
 
-        lda #1                  ; 6 tiles: transfer depth: 1 bit clut
+        lda #1                  ; 12 tiles: transfer depth: 1 bit clut
         sta REG_TDEPTH
         lda #$00                ; black for 0
         sta REG_TLOOKUP
@@ -1842,3 +1893,14 @@ tiles1bits_def:
 !byte %10110100
 !byte %01011100
 
+title_bitmap:
+!bin "si.cru"
+title_bitmap_end:
+
+game_bitmap:
+!bin "lunar.cru"
+game_bitmap_end:
+
+font:
+!bin "7up.fnt"
+font_end:
