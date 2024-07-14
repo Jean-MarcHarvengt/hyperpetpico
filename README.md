@@ -12,6 +12,8 @@ Have a look at the YouTube videos:<br>
 [HyperPET pico Development Tutorial (Part1)](https://youtu.be/D6H2RW0BwQ0?si=l-4htJ7oOXDetJPa)<br>
 [HyperPET pico Development Tutorial (Part2: sprites graphical objects)](https://youtu.be/8ZjlqQmJXdo?si=lpqTXvzPPhYjKBgU)<br>
 [HyperPET pico Development Tutorial (Part3: input controls, sprites collision and more)](https://youtu.be/Cvhr81-Nsuc?si=LmOhA7yWKkGvkm37)<br>
+[HyperPET pico Development Tutorial (Part4: font and bitmap graphical objects)](https://youtu.be/PuI7KokQmL0?si=zpOtQVOJBIqyxxmz
+)<br>
 
 <br>
 Initially the purpose of the project was to offer VGA output to the PET.<br>
