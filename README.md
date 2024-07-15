@@ -132,10 +132,11 @@ To ease development, the plugin module can be used as a standalone PET system<br
 </p>
 
 ## HYPERPET PICO Memory Map
-|  Register       | Address    | Data                      | Description                      |
-| ----------      | -------    | ------------------------- | -------------------------------- |
-| REG_TEXTMAP_L1  | 8000-87ff  | PETSCI char     s (0-255) | videomem standard petfont text map in L1.(83ff for 4032, 87ff for 8032) |
-| ----------      | -------    | ------------------------- | -------------------------------- |
+|  Register       | Address    | Data                      | Description                                                             |
+| --------------- | -------    | ------------------------- | ----------------------------------------------------------------------- |
+| REG_TEXTMAP_L1  | 8000-87ff  | PETSCI chars      (0-255) | videomem standard petfont text map in L1 (83ff for 4032, 87ff for 8032) |
+| --------------- | -------    | ------------------------- | ----------------------------------------------------------------------- |
+| REG_TILEMAP_L1  | 8800-8fff  | tile id (0-255) in 8x8    | videomem expanded tiles map in L1                                       |
 
 
 
