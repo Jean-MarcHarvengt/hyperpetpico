@@ -131,6 +131,12 @@ To ease development, the plugin module can be used as a standalone PET system<br
 <img src="/images/mod.png" width="320" height="240" />  
 </p>
 
+## HYPERPET PICO Memory Map
+|  Register  | Address | Data                      | Description                      |
+| ---------- | ------- | ------------------------- | -------------------------------- |
+| REG_VSYNC  | 0x8000  | bladi bladi               |bladi bla                         |
+
+
 ## Special credits
 Hyperpetpico reuse or is inspired from the code of below projects
 * [PicoVGA](https://github.com/Panda381/PicoVGA)
