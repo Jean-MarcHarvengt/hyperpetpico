@@ -43,7 +43,7 @@ The HyperPET pico exists in 2 boards<br>
 
 The picture on the PET monitor is mirrored to VGA by default (80/40 columns modes)<br>
 Programs can be loaded (via tape emulation, or modern devices as PETdisk or PETdisk MAX 2 or the resident File Browser)<br>
-As soon a program make uses of extended graphics capabilities, only VGA output will show it/them<br>
+As soon a program make uses of extended graphics capabilities, only VGA output will show it<br>
 The rest of the PET hardware is just used normally (CPU, RAM, ROM, keyboard, PIA, VIA ...)<br>
 New registers are available through the memory region $9000-$9FFF (R/W)<br>
 The region $A000-$AFFF is available as extra RAM (R/W) or to store custom ROMs (the File Browser being the default).
@@ -67,23 +67,22 @@ To ease development, the plugin module can be used as a standalone PET system<br
 
 ## Installation procedure
 * all PICO binaries are part of the repository in the "/bin" subdir.
-* refer to the PICO documentation for more details about how to flash it
 * format the 1MB hyperpet flash storage (one time operation)
   * power the PICO while pressing the button (uf2 programming mode)
   * program the "filesystem exposure utility" by drag and drop of the file "/bin/flashfs_mount_or_create+mount.uf2" on the PICO storage
-  * When the flashing is finished, another mass storage icon HP-PICOCARD will appear representing the 1MB available for the hyperpet
+  * When the flashing is finished, another mass storage icon HP-PICOCARD will appear representing the 1MB storage available for the hyperpet
   * by default HP-PICOCARD contains the file "HYPERPET.CFG".
   * this file contains the default configuration. You can change the options in the file using an editor (e.g. boot in 40 colums if you have a 4032 PET) 
 * drag and drop all the programs you want to the HP-PICOCARD USB storage device
   * the "/prgs" subdir contains few examples, you can copy for e.g. basic,demos,petscii and roms subdirectories to HP-PICOCARD
-* flash the hyperpetpico application to the PICO
+* finally flash the hyperpetpico application to the PICO
   * power the PICO while pressing the button (uf2 programming mode)
   * drag and drop "bin/hyperpetpicopetio.uf2" if you intent to use the HyperPET module on a real PET
   * OR drag and drop "bin/hyperpetpicoemuwifi.uf2" if you intent to use the module as standalone emulator
 * the HyperPET module is ready to use! 
 * on a real pet:
   * install the innerboard inside the PET8032, on the memory expansion slots
-  * cut the 9xxx pullup and connect the CS wire (see picture)
+  * cut the 9xxx pullup and connect the inner mudule CS wire to PET PCB (see picture)
   * plug the HyperPET module to the inner board connector comming at the side of the pet
   * connect VGA and audio 
   * power the HyperPET module via USB cable
@@ -121,7 +120,7 @@ To ease development, the plugin module can be used as a standalone PET system<br
   * binary
   * put "myprogram.prg"       => will run the program immediately
   * put "myprogram.prg" reset => will reset the PET emulation
-  * put "myprogram.prg" key   => will simulate a key press
+  * put "myprogram.prg" key   => will simulate a key press (space key)
 
 ## Hardware modification
 * this is required to allow the CPU to read the memory range $9000-$FFFF on the bus expansion and not only $9000-$9fff 
