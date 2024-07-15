@@ -134,11 +134,17 @@ To ease development, the plugin module can be used as a standalone PET system<br
 ## HYPERPET PICO Memory Map
 |  Register       | Address    | Data                            | Description                                                             |
 | --------------- | -------    | ------------------------------- | ----------------------------------------------------------------------- |
-| REG_TEXTMAP_L1  | 8000-87ff  | PETSCI chars      (0-255)       | videomem standard petfont text map in L1 (83ff for 4032, 87ff for 8032) |
-| REG_TILEMAP_L1  | 8800-8fff  | tile id (0-255/0-63) 8x8/16x16  | videomem expanded tiles map in L1 |
-| REG_TILEMAP_L0  | 9000-97ff  | tile id (0-255/0-63) 8x8/16x16  | videomem expanded tiles map in L0 |
-
-
+| REG_TEXTMAP_L1  | 8000-87ff  | PETSCI chars      (0-255)       | petfont text map in L1 (0x400 for 4032, 0x800 for 8032)|
+| REG_TILEMAP_L1  | 8800-8fff  | tile id (0-255/0-63) 8x8/16x16  | tiles map in L1 |
+| REG_TILEMAP_L0  | 9000-97ff  | tile id (0-255/0-63) 8x8/16x16  | tiles map in L0 |
+| REG_SPRITE_IND  | 9800-9860  | 0-5: id (max 63) <br> 6: hflip <br> 7: vflip | sprite id (96 sprites) |
+| REG_SPRITE_XHI  | 9880-98e0  | 0-7: x (hi-byte) | sprite X coord (96 sprites) |
+| REG_SPRITE_XLO  | 9900-9960  | 0-7: x (lo-byte) | sprite X coord (96 sprites) |
+| REG_SPRITE_Y    | 9980-99e0  | 0-7: y | sprite Y coord (96 sprites) |
+| | | | |
+| | | | |
+| | | | |
+| | | | |
 
 ## Special credits
 Hyperpetpico reuse or is inspired from the code of below projects
