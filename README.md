@@ -23,9 +23,11 @@ At this point of time, the HyperPET pico project supports:
 * VGA output up to 640x200 (80 colums)
 * extended graphical modes including (640/320/256)x200 resolutions in 256 colors.
 * 16 "flippable" SPRITES (reusable up to 96)
-* dual layers: 2 TILES layers (8x8 or 16x16) or TILES + TEXT with smooth scrolling
-* 320x200 BITMAP mode (256 colors) on the lower layer
-* background color/line raster colors
+* dual layers: 2 TILES layers (8x8 or 16x16)
+* dual layers: 1 TILES layer + PET TEXT layer
+* dual layers: 1 BITMAP layer (max 320x200, 256 colors) + 1 TILES layer
+* background layer: plain color or line raster colors
+* smooth scrolling in all layers (horizontal and verstical)
 * SID sound emulation
 * extra 4K RAM in $a000 (1 bank, may be more in future!)
 * OR selectable ROM in $a000 (via resident File Browser)
