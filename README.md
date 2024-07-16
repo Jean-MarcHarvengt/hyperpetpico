@@ -132,19 +132,46 @@ To ease development, the plugin module can be used as a standalone PET system<br
 </p>
 
 ## HYPERPET PICO Memory Map
-|  Register       | Address    | Data                            | Description                                                             |
-| --------------- | -------    | ------------------------------- | ----------------------------------------------------------------------- |
-| REG_TEXTMAP_L1  | 8000-87ff  | PETSCI chars      (0-255)       | petfont text map in L1 (0x400 for 4032, 0x800 for 8032)|
-| REG_TILEMAP_L1  | 8800-8fff  | tile id (0-255/0-63) 8x8/16x16  | tiles map in L1 |
-| REG_TILEMAP_L0  | 9000-97ff  | tile id (0-255/0-63) 8x8/16x16  | tiles map in L0 |
-| REG_SPRITE_IND  | 9800-9860  | 0-5: id (max 63) <br> 6: hflip <br> 7: vflip | sprite id (96 sprites) |
-| REG_SPRITE_XHI  | 9880-98e0  | 0-7: x (hi-byte) | sprite X coord HI (96 sprites) |
-| REG_SPRITE_XLO  | 9900-9960  | 0-7: x (lo-byte) | sprite X coord LO (96 sprites) |
-| REG_SPRITE_Y    | 9980-99e0  | 0-7: y | sprite Y coord (96 sprites) |
-| REG_VIDEO_MODE  | 9b00       | 0 = 640x200 <br> 1 = 320x200 <br> 2 = 256x200 <br>| video mode (resolution) |
-| | | | |
-| | | | |
-| | | | |
+|  Register        | Address    | Data                            | Description                                                             |
+| ---------------- | -------    | ------------------------------- | ----------------------------------------------------------------------- |
+| REG_TEXTMAP_L1   | 8000-87ff  | PETSCI chars      (0-255)       | petfont text map in L1 (0x400 for 4032, 0x800 for 8032)|
+| REG_TILEMAP_L1   | 8800-8fff  | tile id (0-255/0-63) 8x8/16x16  | tiles map in L1 |
+| REG_TILEMAP_L0   | 9000-97ff  | tile id (0-255/0-63) 8x8/16x16  | tiles map in L0 |
+| REG_SPRITE_IND   | 9800-9860  | bits0-5: id (max 63) <br> bit6: hflip <br> bit7: vflip | sprite id (96 sprites) |
+| REG_SPRITE_XHI   | 9880-98e0  | bits0-7: x (hi-byte) | sprite X coord HI (96 sprites) |
+| REG_SPRITE_XLO   | 9900-9960  | bits0-7: x (lo-byte) | sprite X coord LO (96 sprites) |
+| REG_SPRITE_Y     | 9980-99e0  | bits0-7: y | sprite Y coord (96 sprites) |
+| REG_TLOOKUP      | 9a00-9aff  | 1/2/4/8/N bytes as 1/4/8/16..256 RGB332 colors | CLUT Palette <br> Also used as transfer parameters extension|
+| REG_VIDEO_MODE   | 9b00       | 0 = 640x200 <br> 1 = 320x200 <br> 2 = 256x200 <br>| video mode (resolution) |
+| REG_BG_COL       | 9b01       | bits0-7: color (RGB332) <br> bits5-7, R 0x20 -> 0xe0 <br> bits2-4, G 0x04 -> 0x1c <br> bits0-1, B 0x00 -> 0x03 | background color |
+| REG_FG_COL       | 9b0d       | bits0-7: color (RGB332) | foreground/text color |
+| REG_LAYERS_CFG   | 9b02       | bit0: L0 on/off (1=on) <br> bit1: L1 on/off (1=on) <br> bit2: L2 on/off (1=on) <br> bit3: L2 inbetween (0 = sprites top) <br> bit4: bitmap/tile in L0 (0=bitmap) <br> bit5: petfont/tile in L1 (0=petfont) <br> bit6: enable scroll area in L0 <br> bit7: enable scroll area in L1| layers configuration |
+| REG_TILES_CFG    | 9b0e       | | |
+| REG_LINES_CFG    | 9b03       | | |
+| REG_XSCROLL_HI   | 9b04       | | |
+| REG_XSCROLL_L0   | 9b05       | | |
+| REG_XSCROLL_L1   | 9b06       | | |
+| REG_YSCROLL_L0   | 9b07       | | |
+| REG_YSCROLL_L1   | 9b08       | | |
+| REG_SC_START_L0  | 9b09       | | |
+| REG_SC_END_L0    | 9b0a       | | |
+| REG_SC_START_L1  | 9b0b       | | |
+| REG_SC_END_L1    | 9b0c       | | |
+| REG_VSYNC        | 9b0f       | | |
+| REG_TDEPTH       | 9b10       | | |
+| REG_TCOMMAND     | 9b11       | | |
+| REG_TPARAMS      | 9b12       | | |
+| REG_TDATA        | 9b13       | | |
+| REG_TSTATUS      | 9b14       | | |
+| REG_?????????????| 9b15-9b17  | | |
+| REG_LINES_BG_COL | 9b38-9bff  | | |
+| REG_LINES_XSCR_HI| 9c00-9cc7  | | |
+| REG_LINES_L0_XSCR| 9cc8-9d8f  | | |
+| REG_LINES_L1_XSCR| 9d90-9e57  | | |
+| REG_?????????????| 9e60-9eff  | | |
+| REG_SPRITE_COL_LO| 9f00-9f7f  | | |
+| REG_SPRITE_COL_HI| 9f80-9fff  | | |
+| REG_SID_BASE     | 9b18-9b37  | | |
 
 ## Special credits
 Hyperpetpico reuse or is inspired from the code of below projects
