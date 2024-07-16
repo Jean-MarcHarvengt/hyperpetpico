@@ -170,7 +170,7 @@ To ease development, the plugin module can be used as a standalone PET system<br
 | REG_LINES_L1_XSCR| 9d90-9e57  | bits7-0: L1 xscroll LO | per raster line L1 horiz scolling LO byte  |
 | REG_?????????????| 9e60-9eff  | | unused |
 | REG_SPRITE_COL_LO| 9f00-9f5f  | 1byte (8bits) for each of the 96 sprites | sprite collision bits (sprites 7-0) |
-| REG_SPRITE_COL_HI| 9f80-9fdf  | 1byte (8bits) for each of the 96 sprites | sprite collision bits (sprites 15-8 |
+| REG_SPRITE_COL_HI| 9f80-9fdf  | 1byte (8bits) for each of the 96 sprites | sprite collision bits (sprites 15-8) |
 | REG_SID_BASE     | 9b18-9b37  | see C64 spec | SID base register |
 
 ## Special credits
