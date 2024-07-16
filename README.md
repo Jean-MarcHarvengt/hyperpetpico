@@ -134,44 +134,44 @@ To ease development, the plugin module can be used as a standalone PET system<br
 ## HYPERPET PICO Memory Map
 |  Register        | Address    | Data                            | Description                                                             |
 | ---------------- | -------    | ------------------------------- | ----------------------------------------------------------------------- |
-| REG_TEXTMAP_L1   | 8000-87ff  | PETSCI chars      (0-255)       | petfont text map in L1 (0x400 for 4032, 0x800 for 8032)|
+| REG_TEXTMAP_L1   | 8000-87ff  | PETSCI char id (0-255)       | petfont text map in L1 (0x400 for 4032, 0x800 for 8032)|
 | REG_TILEMAP_L1   | 8800-8fff  | tile id (0-255/0-63) 8x8/16x16  | tiles map in L1 |
 | REG_TILEMAP_L0   | 9000-97ff  | tile id (0-255/0-63) 8x8/16x16  | tiles map in L0 |
 | REG_SPRITE_IND   | 9800-9860  | bits0-5: id (max 63) <br> bit6: hflip <br> bit7: vflip | sprite id (96 sprites) |
 | REG_SPRITE_XHI   | 9880-98e0  | bits0-7: x (hi-byte) | sprite X coord HI (96 sprites) |
-| REG_SPRITE_XLO   | 9900-9960  | bits0-7: x (lo-byte) | sprite X coord LO (96 sprites) |
-| REG_SPRITE_Y     | 9980-99e0  | bits0-7: y | sprite Y coord (96 sprites) |
-| REG_TLOOKUP      | 9a00-9aff  | 1/2/4/8/N bytes as 1/4/8/16..256 RGB332 colors | CLUT Palette <br> Also used as transfer parameters extension|
+| REG_SPRITE_XLO   | 9900-995f  | bits0-7: x (lo-byte) | sprite X coord LO (96 sprites) |
+| REG_SPRITE_Y     | 9980-99df  | bits0-7: y | sprite Y coord (96 sprites) |
+| REG_TLOOKUP      | 9a00-9aff  | 1/2/4/16..256 RGB332 colors for 1/2/4/8 BPP mode | Color LUT <br> Also used as transfer parameters extension|
 | REG_VIDEO_MODE   | 9b00       | 0 = 640x200 <br> 1 = 320x200 <br> 2 = 256x200 <br>| video mode (resolution) |
 | REG_BG_COL       | 9b01       | bits0-7: color (RGB332) <br> bits5-7, R 0x20 -> 0xe0 <br> bits2-4, G 0x04 -> 0x1c <br> bits0-1, B 0x00 -> 0x03 | background color |
 | REG_FG_COL       | 9b0d       | bits0-7: color (RGB332) | foreground/text color |
 | REG_LAYERS_CFG   | 9b02       | bit0: L0 on/off (1=on) <br> bit1: L1 on/off (1=on) <br> bit2: L2 on/off (1=on) <br> bit3: L2 inbetween (0 = sprites top) <br> bit4: bitmap/tile in L0 (0=bitmap) <br> bit5: petfont/tile in L1 (0=petfont) <br> bit6: enable scroll area in L0 <br> bit7: enable scroll area in L1| layers configuration |
-| REG_TILES_CFG    | 9b0e       | | |
-| REG_LINES_CFG    | 9b03       | | |
-| REG_XSCROLL_HI   | 9b04       | | |
-| REG_XSCROLL_L0   | 9b05       | | |
-| REG_XSCROLL_L1   | 9b06       | | |
-| REG_YSCROLL_L0   | 9b07       | | |
-| REG_YSCROLL_L1   | 9b08       | | |
-| REG_SC_START_L0  | 9b09       | | |
-| REG_SC_END_L0    | 9b0a       | | |
-| REG_SC_START_L1  | 9b0b       | | |
-| REG_SC_END_L1    | 9b0c       | | |
-| REG_VSYNC        | 9b0f       | | |
-| REG_TDEPTH       | 9b10       | | |
-| REG_TCOMMAND     | 9b11       | | |
-| REG_TPARAMS      | 9b12       | | |
-| REG_TDATA        | 9b13       | | |
-| REG_TSTATUS      | 9b14       | | |
-| REG_?????????????| 9b15-9b17  | | |
-| REG_LINES_BG_COL | 9b38-9bff  | | |
-| REG_LINES_XSCR_HI| 9c00-9cc7  | | |
-| REG_LINES_L0_XSCR| 9cc8-9d8f  | | |
-| REG_LINES_L1_XSCR| 9d90-9e57  | | |
-| REG_?????????????| 9e60-9eff  | | |
-| REG_SPRITE_COL_LO| 9f00-9f7f  | | |
-| REG_SPRITE_COL_HI| 9f80-9fff  | | |
-| REG_SID_BASE     | 9b18-9b37  | | |
+| REG_TILES_CFG    | 9b0e       | bit0: L0: 0=8x8, 1=16x16 <br> bit1: L1: 0=8x8, 1=16x16 <br> bit2: horiz curtain (1=on) <br> bit4: 8/16 pixels left (1=16) <br> bit5: vert curtain(1=on) <br> bit6: 8/16 pixels top (1=16) <br> | tile layer configuration |
+| REG_LINES_CFG    | 9b03       | 0: single/perline background color <br> 1: single/perline L0 xscroll <br> 2: single/perline L1 xscroll | per raster line feature |
+| REG_XSCROLL_HI   | 9b04       | bits3-0: L0 xscroll HI <br> bits7-4: L1 xscroll HI | L0/L1 horizontal scrolling HI nible |
+| REG_XSCROLL_L0   | 9b05       | bits7-0: L0 xscroll LO | L0 horizontal scrolling LO byte |
+| REG_XSCROLL_L1   | 9b06       | bits7-0: L1 xscroll LO | L1 horizontal scrolling LO byte |
+| REG_YSCROLL_L0   | 9b07       | bits7-0: L0 yscroll | L0 vertical scrolling byte |
+| REG_YSCROLL_L1   | 9b08       | bits7-0: L1 yscroll | L1 vertical scrolling byte |
+| REG_SC_START_L0  | 9b09       | 0...24 | L0 scroll window start row |
+| REG_SC_END_L0    | 9b0a       | 0...24 | L0 scroll window end row |
+| REG_SC_START_L1  | 9b0b       | 0...24 | L1 scroll window start row |
+| REG_SC_END_L1    | 9b0c       | 0...24 | L1 scroll window end row |
+| REG_VSYNC        | 9b0f       | 0...200 (200 is overscan)  | current rendered line, used as hsync/vsync |
+| REG_TDEPTH       | 9b10       | 1/2/4/8 Bits Per Pixel (CLUT indexed) <br> 9: no clut <br> 0: packed | gfx transfer color depth |
+| REG_TCOMMAND     | 9b11       | 1 => 9| transfer command |
+| REG_TPARAMS      | 9b12       | byte (write N times)| transfer params  |
+| REG_TDATA        | 9b13       | byte (write N times) | transfer data |
+| REG_TSTATUS      | 9b14       | 1: busy <br> 0: done| transfer status |
+| REG_?????????????| 9b15-9b17  | | unused |
+| REG_LINES_BG_COL | 9b38-9bff  | bits7-0: color as RGB332 | per raster line background color |
+| REG_LINES_XSCR_HI| 9c00-9cc7  | bits3-0: L0 xscroll HI <br> bits7-4: L1 xscroll HI | per raster L0/L1 horiz scolling HI nibble  |
+| REG_LINES_L0_XSCR| 9cc8-9d8f  | bits7-0: L0 xscroll LO | per raster line L0 horiz scolling LO byte  |
+| REG_LINES_L1_XSCR| 9d90-9e57  | bits7-0: L1 xscroll LO | per raster line L1 horiz scolling LO byte  |
+| REG_?????????????| 9e60-9eff  | | unused |
+| REG_SPRITE_COL_LO| 9f00-9f5f  | 1byte (8bits) for each of the 96 sprites | sprite collision bits (sprites 7-0) |
+| REG_SPRITE_COL_HI| 9f80-9fdf  | 1byte (8bits) for each of the 96 sprites | sprite collision bits (sprites 15-8 |
+| REG_SID_BASE     | 9b18-9b37  | see C64 spec | SID base register |
 
 ## Special credits
 Hyperpetpico reuse or is inspired from the code of below projects
