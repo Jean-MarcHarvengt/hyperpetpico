@@ -20,7 +20,7 @@ Initially the purpose of the project was to offer VGA output to the PET.<br>
 At this point of time, the HyperPET pico project supports:
 <br>
 
-* VGA output up to 640x200 (80 colums)
+* VGA/HDMI output up to 640x200 (80 colums)
 * extended graphical modes including (640/320/256)x200 resolutions in 256 colors.
 * 16 "flippable" SPRITES (reusable up to 96)
 * dual layers: 2 TILES layers (8x8 or 16x16)
@@ -43,7 +43,7 @@ The HyperPET pico exists in 2 boards<br>
 
 <br>
 
-The picture on the PET monitor is mirrored to VGA by default (80/40 columns modes)<br>
+The picture on the PET monitor is mirrored to VGA/HDMI by default (80/40 columns modes)<br>
 Programs can be loaded (via tape emulation, or modern devices as PETdisk or PETdisk MAX 2 or the resident File Browser)<br>
 As soon a program make uses of extended graphics capabilities, only VGA output will show it<br>
 The rest of the PET hardware is just used normally (CPU, RAM, ROM, keyboard, PIA, VIA ...)<br>
@@ -110,8 +110,9 @@ To ease development, the plugin module can be used as a standalone PET system<br
     * #set(TARGET hyperpetpicoemuwifi) => to use as standalone emu with wifi (picow only)
   * mkdir build
   * cd build
-  * picow: cmake -DPICO_BOARD=pico_w ..
   * pico : cmake .. 
+  * picow: cmake -DPICO_BOARD=pico_w ..
+  * pico2: cmake -DPICO_PLATFORM=rp2350 -DPICO_BOARD=pico2 ..
   * make
 
 ## Connect over WiFi to the HyperPET pico standalone module (with picow)
@@ -123,6 +124,10 @@ To ease development, the plugin module can be used as a standalone PET system<br
   * put "myprogram.prg"       => will run the program immediately
   * put "myprogram.prg" reset => will reset the PET emulation
   * put "myprogram.prg" key   => will simulate a key press (space key)
+
+## Connect over USB to the HyperPET pico standalone module (pico2)
+connect pico2 USB micro to PC via USB (use a data cable, same as when you program the pico2)
+Use "vkey" application (in tools) to simulate keyboard and transfer programs
 
 ## Hardware modification
 * this is required to allow the CPU to read the memory range $9000-$FFFF on the bus expansion and not only $9000-$9fff 
