@@ -67,11 +67,17 @@ To ease development, the plugin module can be used as a standalone PET system<br
 <img src="/images/proto2.png" width="240" height="260" />  
 </p>
 
+## HyperPET pico V1 et V2 diversity
+* V1 is for pico and picow and has VGA output
+  * use binaries that does not end up with "2" 
+* V2 is for pico2 and has HDMI output + extra USB port + SDcard reader
+  * use binaries that ends up with "2" (pico 2!)
+
 ## Installation procedure
 * all PICO binaries are part of the repository in the "/bin" subdir.
 * format the 1MB hyperpet flash storage (one time operation)
   * power the PICO while pressing the button (uf2 programming mode)
-  * program the "filesystem exposure utility" by drag and drop of the file "/bin/flashfs_mount_or_create+mount.uf2" on the PICO storage
+  * program the "filesystem exposure utility" by drag and drop of the file "flashfs_mount_or_create+mount.uf2" ("flashfs_mount_or_create+mount2.uf2") on the PICO storage
   * When the flashing is finished, another mass storage icon HP-PICOCARD will appear representing the 1MB storage available for the hyperpet
   * by default HP-PICOCARD contains the file "HYPERPET.CFG".
   * this file contains the default configuration. You can change the options in the file using an editor (e.g. boot in 40 colums if you have a 4032 PET) 
@@ -79,8 +85,8 @@ To ease development, the plugin module can be used as a standalone PET system<br
   * the "/prgs" subdir contains few examples, you can copy for e.g. basic,demos,petscii and roms subdirectories to HP-PICOCARD
 * finally flash the hyperpetpico application to the PICO
   * power the PICO while pressing the button (uf2 programming mode)
-  * drag and drop "bin/hyperpetpicopetio.uf2" if you intent to use the HyperPET module on a real PET
-  * OR drag and drop "bin/hyperpetpicoemuwifi.uf2" if you intent to use the module as standalone emulator
+  * drag and drop "hyperpetpicopetio.uf2" ("hyperpetpicopetio2.uf2") if you intent to use the HyperPET module on a real PET
+  * OR drag and drop "hyperpetpicoemuwifi.uf2" ("hyperpetpicoemu2.uf2") if you intent to use the module as standalone emulator
 * the HyperPET module is ready to use! 
 * on a real pet:
   * install the innerboard inside the PET8032, on the memory expansion slots
@@ -125,7 +131,7 @@ To ease development, the plugin module can be used as a standalone PET system<br
   * put "myprogram.prg" reset => will reset the PET emulation
   * put "myprogram.prg" key   => will simulate a key press (space key)
 
-## Connect over USB to the HyperPET pico standalone module (pico2)
+## Connect over USB to the HyperPET pico standalone module (with pico2)
 * connect pico2 USB micro to PC via USB (use a data cable, same as when you program the pico2)
 * use the "vkey" application (in tools) to simulate keyboard and transfer programs
 
