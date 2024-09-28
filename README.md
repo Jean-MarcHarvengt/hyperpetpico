@@ -126,8 +126,8 @@ To ease development, the plugin module can be used as a standalone PET system<br
   * put "myprogram.prg" key   => will simulate a key press (space key)
 
 ## Connect over USB to the HyperPET pico standalone module (pico2)
-connect pico2 USB micro to PC via USB (use a data cable, same as when you program the pico2)
-Use "vkey" application (in tools) to simulate keyboard and transfer programs
+* connect pico2 USB micro to PC via USB (use a data cable, same as when you program the pico2)
+* use the "vkey" application (in tools) to simulate keyboard and transfer programs
 
 ## Hardware modification
 * this is required to allow the CPU to read the memory range $9000-$FFFF on the bus expansion and not only $9000-$9fff 
