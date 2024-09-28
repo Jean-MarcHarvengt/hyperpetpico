@@ -1,6 +1,7 @@
 #ifndef PWM_AUDIO_H
 #define PWM_AUDIO_H
 
+#include "stdint.h"
 #include "global.h"
 
 #ifdef AUDIO_8BIT

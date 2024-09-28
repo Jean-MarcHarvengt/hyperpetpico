@@ -1303,7 +1303,7 @@ tiles0:
         cpx #$40+2
         bne tiles0
 
-        lda #1                  ; 6 tiles: transfer depth: 1 bit clut
+        lda #1                  ; 12 tiles: transfer depth: 1 bit clut
         sta REG_TDEPTH
         lda #$00                ; black for 0
         sta REG_TLOOKUP

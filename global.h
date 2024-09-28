@@ -7,6 +7,9 @@
 //#define HAS_PETIO       1  	// PET extension (or standalone emu)
 //#define HAS_NETWORK     1     // enable network wifi (standalone mode emu only)  
 #define HAS_USBHOST     1     // enable USB keyboard
+#ifdef ISRP2350 
+#define HAS_USBDEVICE   1     // enable USB serial
+#endif
 
 #define PETIO_A000      1     // enable A000-AFFF ROM emulation
 //#define PETIO_EDIT      1     // enable E000-E7FF ROM emulation
@@ -15,8 +18,11 @@
 #define SIXTYHZ         1     // 60Hz mode
 #define WIFI_AP         1     // WIFI as access point (preferred!)
 
-#define AUDIO_8BIT      1     // audio samples are 8bits
+#ifdef ISRP2040 
+#define HAS_AUDIO     1       // enable audio
+#endif
 
+#define AUDIO_8BIT      1     // audio samples are 8bits
 //#define AUDIO_CBACK     1     // handle audio samples from VGA line callback
 //#define AUDIO_IRQ       1     // handle audio samples from IRQ
 //#define AUDIO_1DMA      1     // handle audio samples with 1 DMA
@@ -121,48 +127,4 @@ typedef unsigned char Bool;
 #define PI 3.14159265358979324
 #define PI2 (3.14159265358979324*2)
 
-// ----------------------------------------------------------------------------
-//                                   Includes
-// ----------------------------------------------------------------------------
-// system includes
-#include <string.h>
 
-// SDK includes
-#include "boards/pico.h"
-
-#include "hardware/clocks.h"
-#include "hardware/divider.h"
-#include "hardware/dma.h"
-#include "hardware/gpio.h"
-#include "hardware/irq.h"
-#include "hardware/pio.h"
-#include "hardware/pio_instructions.h"
-#include "hardware/platform_defs.h"
-#include "hardware/pll.h"
-#include "hardware/pwm.h"
-#include "hardware/resets.h"
-#include "hardware/sync.h"
-#include "hardware/timer.h"
-#include "hardware/vreg.h"
-#include "hardware/structs/ssi.h"
-//#include "hardware/uart.h"
-
-#include "pico.h"
-#include "pico/multicore.h"
-#include "pico/stdlib.h"
-#include "pico/types.h"
-#include "pico/config.h"
-#include "pico/float.h"
-#include "pico/mutex.h"
-#include "pico/platform.h"
-//#include "pico/printf.h"
-#include "pico/util/queue.h"
-
-// PicoVGA includes
-#include "define.h"	// common definitions of C and ASM
-#include "util/overclock.h" // overclock
-#include "vga_vmode.h"	// VGA videomodes
-#include "vga.h"	 // VGA output
-
-#define PrintSetup(...)
-#define PrintClear()

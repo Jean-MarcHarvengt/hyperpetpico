@@ -277,6 +277,7 @@ void petbus_init(void)
 //  pio_sm_set_enabled(pio, sm, true);
 
   // Disable all interrupts on this core
+  /*
   irq_set_enabled(TIMER_IRQ_0, false);
   irq_set_enabled(TIMER_IRQ_1, false);
   irq_set_enabled(TIMER_IRQ_2, false);
@@ -302,6 +303,7 @@ void petbus_init(void)
   irq_set_enabled(I2C0_IRQ, false);
   irq_set_enabled(I2C1_IRQ, false);
   irq_set_enabled(RTC_IRQ, false);
+  */
 
   pio_enable_sm_mask_in_sync(pio, (1 << sm) | (1 << smread));
   pio_sm_clear_fifos(pio,sm);

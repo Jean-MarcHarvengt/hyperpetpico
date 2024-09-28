@@ -1,5 +1,12 @@
 #include "pwm_audio.h"
 
+#include "hardware/dma.h"
+#include "hardware/gpio.h"
+#include "hardware/irq.h"
+#include "hardware/pwm.h"
+#include "pico/float.h"
+#include <string.h>
+
 #ifdef AUDIO_CBACK
 #define SAMPLE_REPEAT_SHIFT 0    // not possible to repeat samples CBACK!!
 #endif

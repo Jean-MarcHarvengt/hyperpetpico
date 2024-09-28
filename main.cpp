@@ -7,6 +7,8 @@
 #include "petfont.h"
 #include "reSID.h"
 
+#include "gfx_output.h"
+
 #include "pwm_audio.h"
 #include "petbus.h"
 #ifndef HAS_PETIO
@@ -43,16 +45,16 @@ extern "C" void hid_app_task(void);
 #include "edit450.h"
 #include "edit48050.h"
 
+
+#ifndef HAS_PETIO
+#ifdef HAS_USBDEVICE
+#include "usb_serial.h"
+#endif
+#endif
+
+
 // Graphics
 #define VGA_RGB(r,g,b)   ( (((r>>5)&0x07)<<5) | (((g>>5)&0x07)<<2) | (((b>>6)&0x3)<<0) )
-
-// Video mode
-#ifdef SIXTYHZ
-#define VideoMod VideoVGA
-#else
-#define VideoMod VideoPALp
-#endif
-//#define VideoMod VideoEGA
 
 #define VMODE_HIRES    0
 #define VMODE_LORES    1
@@ -92,19 +94,10 @@ extern "C" void hid_app_task(void);
 // Others
 #define GFX_MARGIN     128
 
-// Video configurations
-static sVmode Vmode0; // videomode setup
-static sVgaCfg Cfg0;  // required configuration
-static sVmode Vmode1;
-static sVgaCfg Cfg1;
-static sVmode Vmode2;
-static sVgaCfg Cfg2;
+
 
 // Screen resolution
 static u8 video_default = VMODE_HIRES;
-static u8 video_mode;
-static u16 screen_height = 200;
-static u16 screen_width;
 
 // Frame buffer
 static ALIGNED u8 Bitmap[LO_XRES*MAXHEIGHT+GFX_MARGIN];
@@ -173,6 +166,10 @@ static bool kbdasjoy = false;
 #define JOY_RIGHT   (8) 
 #define JOY_FIRE    (1+2)
 
+#ifdef ISRP2350 
+static int doorbell_id;
+#endif
+
 // ****************************************
 // Audio code
 // ****************************************
@@ -216,11 +213,6 @@ static void sid_dump( void )
 // ****************************************
 // Setup Video mode
 // ****************************************
-static void VgaCoreWithSound()
-{
-  VgaCore();
-}
-
 static void ResetGFXMem(void) 
 {
   memset((void*)&Bitmap[0],0, sizeof(Bitmap));
@@ -228,89 +220,15 @@ static void ResetGFXMem(void)
   memset((void*)&SpriteData[0],0, sizeof(SpriteData));
 }
 
-static void VideoInit(u8 mode, bool firstTime)
-{
-  // initialize base layer 0
-  switch (mode) {
-    case 0: // 640x200
-      screen_width = 640;
-      // initialize videomode
-      if (firstTime) {
-        set_sys_clock_pll(Vmode0.vco*1000, Vmode0.pd1, Vmode0.pd2);
-        VgaInitReq(&Vmode0);
-      }
-      else VgaInit(&Vmode0);
-      break;
-    case 1: // 320x200
-      screen_width = 320;
-      // initialize videomode
-      if (firstTime) {
-        set_sys_clock_pll(Vmode1.vco*1000, Vmode1.pd1, Vmode1.pd2);
-        VgaInitReq(&Vmode1);
-      }
-      else VgaInit(&Vmode1);
-      break;
-    case 2: // 256x200
-      screen_width = 256;
-      // initialize videomode
-      if (firstTime) {
-        set_sys_clock_pll(Vmode2.vco*1000, Vmode2.pd1, Vmode2.pd2);
-        VgaInitReq(&Vmode2);
-      }
-      else VgaInit(&Vmode2);
-    default:
-      break; 
-  }
-  video_mode = mode;
-  SET_XSCROLL_L0(0);
-  SET_XSCROLL_L1(0);
-}
-
-
-static void VideoSetup(void)
-{
-  // setup videomode
-  VgaCfgDef(&Cfg0);
-  Cfg0.video = &VideoMod;
-  Cfg0.width = 640;
-  Cfg0.height = screen_height;
-#ifdef SIXTYHZ
-  Cfg0.dbly = true;  
-#endif
-  Cfg0.freq = 250000;
-  VgaCfg(&Cfg0, &Vmode0);
-
-  VgaCfgDef(&Cfg1);
-  Cfg1.video = &VideoMod;
-  Cfg1.width = 320;
-  Cfg1.height = screen_height;
-#ifdef SIXTYHZ
-  Cfg1.dbly = true;  
-#endif
-  Cfg1.freq = 250000;
-  VgaCfg(&Cfg1, &Vmode1);
-
-  VgaCfgDef(&Cfg2);
-  Cfg2.video = &VideoMod;
-  Cfg2.width = 256;
-  Cfg2.height = screen_height;
-#ifdef SIXTYHZ
-  Cfg2.dbly = true;  
-#endif
-  Cfg2.freq = 250000;
-  VgaCfg(&Cfg2, &Vmode2);
-  VideoInit(video_mode, true);
-  SET_VIDEO_MODE(video_mode);
-}
 
 void __not_in_flash("VideoRenderUpdate") VideoRenderUpdate(void)
 {
     mem[REG_VSYNC] = MAXHEIGHT;
     int vmode = GET_VIDEO_MODE;
     if (video_mode != vmode) {
-      if (vmode == 0) VideoInit(0, false);  
-      else if (vmode == 1) VideoInit(1, false); 
-      else VideoInit(2, false);
+      if (vmode == 0) GfxVideoInit(0, false);  
+      else if (vmode == 1) GfxVideoInit(1, false); 
+      else GfxVideoInit(2, false);
     }
 
     // sort sprites by Y, max amount sprites per scanline
@@ -439,10 +357,17 @@ void __not_in_flash("VideoRenderUpdate") VideoRenderUpdate(void)
       mem[REG_SPRITE_COL_HI+i] = colbits;
       */       
     }
+#ifdef HAS_AUDIO
     sid_dump();
+#endif    
 #ifndef HAS_PETIO
 #ifdef EMU_ACCURATE
+#ifdef ISRP2040 
     multicore_fifo_push_blocking(1);
+#endif
+#ifdef ISRP2350 
+    multicore_doorbell_set_other_core(doorbell_id);
+#endif
 #endif
 #endif
 }
@@ -616,7 +541,12 @@ void __not_in_flash("VideoRenderLineL1") VideoRenderLineL1(u8 * linebuffer, int 
   }
 #ifndef HAS_PETIO
 #ifdef EMU_ACCURATE
+#ifdef ISRP2040 
     multicore_fifo_push_blocking(0);
+#endif
+#ifdef ISRP2350 
+    multicore_doorbell_set_other_core(doorbell_id);
+#endif
 #endif 
 #endif
 }
@@ -1438,7 +1368,8 @@ static void pet_remaining(void)
 }
 
 static uint8_t petcol = 0;
-static void core0_sio_irq() {
+static void core0_irq() {
+#ifdef ISRP2040 
   irq_clear(SIO_IRQ_PROC0);
   while(multicore_fifo_rvalid()) {
     uint16_t raw = multicore_fifo_pop_blocking();
@@ -1456,7 +1387,22 @@ static void core0_sio_irq() {
     }  
   } 
   multicore_fifo_clear_irq();
+#endif  
+#ifdef ISRP2350 
+  if (multicore_doorbell_is_set_current_core(doorbell_id)) {
+    if (GfxIsVSync()) {
+      petcol = 0;
+      pet_remaining();
+    }
+    else {
+      petcol = petcol + 1;
+      pet_line();
+    } 
+    multicore_doorbell_clear_current_core(doorbell_id);
+  }
+#endif  
 }
+
 #endif
 
 static void _set(uint8_t k) {
@@ -1585,18 +1531,50 @@ void kbd_signal_raw_key (int keycode, int code, int codeshifted, int flags, int 
 #endif
 
 #ifndef HAS_PETIO
-#ifdef HAS_NETWORK
 // ****************************************
-// TFTP server
+// PRG loader
 // ****************************************
-static int dummy_handle;
 static uint16_t prg_add_start;
 static uint16_t prg_add_cur;
 static uint16_t prg_wr = 0;
 static uint16_t prg_size = 0;
 static bool prg_skip = false;
+static uint8_t slowdown = 0;
 
-static void prg_write(uint8_t * src, int length )
+void pet_command( const char * cmd )
+{
+  pet_running = false;  
+  prg_start = false;
+  prg_wr = 0;
+  prg_size = 0;
+  if (!strcmp(cmd,"reset") ) 
+  {
+    pet_reset = true;
+    prg_skip = true;
+  }
+  else if ( (!strncmp(cmd,"key",3)) && ( strlen(cmd) == 3 ) ) 
+  {
+    pet_running = true;  
+    prg_skip = true;
+    input_chr = ' ';
+    input_delay = 0;
+    slowdown = 0;
+  }
+  else if ( (!strncmp(cmd,"key",3)) && ( strlen(cmd) == 4 ) )  
+  {
+    pet_running = true;  
+    prg_skip = true;
+    input_chr = cmd[3];
+    input_delay = 0;
+    slowdown = 0;
+  }
+  else // can be used to initiate load command
+  {
+    prg_skip = false;
+  }  
+}
+
+void pet_prg_write(uint8_t * src, int length )
 {
   while (1)
   {
@@ -1622,43 +1600,8 @@ static void prg_write(uint8_t * src, int length )
   }
 }
 
-static void* tftp_open(const char* fname, const char* mode, u8_t is_write)
+void pet_prg_run( void )
 {
-  printf("TFTP open: %s\n", fname);
-  LWIP_UNUSED_ARG(mode);
-  pet_running = false;  
-  prg_start = false;
-  prg_wr = 0;
-  prg_size = 0;
-  if (!strcmp(fname,"reset") ) 
-  {
-    pet_reset = true;
-    prg_skip = true;
-  }
-  else if (!strcmp(fname,"key") ) 
-  {
-    pet_running = true;  
-    prg_skip = true;
-    input_chr = ' ';
-    //input_delay = INPUT_DELAY;
-  }
-  else if (!strcmp(fname,"key1") ) 
-  {
-    pet_running = true;  
-    prg_skip = true;
-    input_chr = '1';
-    //input_delay = INPUT_DELAY;
-  }
-  else 
-  {
-    prg_skip = false;
-  }
-  return (void*)&dummy_handle;
-}
-
-static void tftp_close(void* handle)
-{
-  printf("TFTP close\n");
   if (!prg_skip) 
   {
     uint8_t lo,hi;
@@ -1685,7 +1628,61 @@ static void tftp_close(void* handle)
   else 
   {
     prg_skip = false;
-  }
+  }  
+}
+
+
+#ifdef HAS_USBDEVICE
+// ****************************************
+// SERIAL server
+// ****************************************
+static int serial_rx(uint8_t* buf, int len) {
+  // send ack
+  //usb_serial_tx((uint8_t *)"ACK", strlen("ACK"));
+  char cmd[5] = {'k','e','y',' ',0};
+  if (len >= 1) {
+    switch (buf[0]) {
+      case sercmd_reset:
+        pet_command( "reset");
+        break;
+      case sercmd_key:        
+        cmd[3] = toupper((char)buf[1]);
+        pet_command( &cmd[0] );
+        break;
+      case sercmd_prg:
+        pet_prg_write((uint8_t *)&buf[1],len-1); 
+        break;
+      case sercmd_run:
+        pet_prg_run();
+        break;
+      default:
+        break;
+    }  
+  }  
+  return 0;
+}
+#endif
+
+#ifdef HAS_NETWORK
+// ****************************************
+// TFTP server
+// ****************************************
+static int tftp_handle;
+
+static void* tftp_open(const char* fname, const char* mode, u8_t is_write)
+{
+  printf("TFTP open: %s\n", fname);
+  LWIP_UNUSED_ARG(mode);
+
+  pet_command( fname );
+
+  return (void*)&tftp_handle;
+}
+
+static void tftp_close(void* handle)
+{
+  printf("TFTP close\n");
+  void pet_prg_run();
 }
 
 static int tftp_read(void* handle, void* buf, int bytes)
@@ -1700,7 +1697,7 @@ static int tftp_write(void* handle, struct pbuf* p)
     while (p != NULL) {
       prg_size += p->len;
       printf("TFTP write %d\n",p->len);
-      prg_write((uint8_t *)p->payload,p->len);  
+      pet_prg_write((uint8_t *)p->payload,p->len);  
       p = p->next;
     }
   }
@@ -1720,7 +1717,7 @@ static void tftp_error(void* handle, int err, const char* msg, int size)
   printf("TFTP error: %d (%s)", err, message);
 }
 
-static const struct tftp_context tftp = {
+static const struct tftp_context tftp_ctx = {
   tftp_open,
   tftp_close,
   tftp_read,
@@ -1735,10 +1732,6 @@ static const struct tftp_context tftp = {
 // ****************************************
 int main()
 {
-#ifndef HAS_PETIO
-  uint8_t slowdown=0;
-#endif
-
   stdio_init_all();
 
   // PAL mode (only relevant if PETIO_EDIT enabled)
@@ -1752,18 +1745,25 @@ int main()
   uint32_t ip = wifi_init();
   if (ip)
   {
-    tftp_init_common(LWIP_TFTP_MODE_SERVER, &tftp);
+    tftp_init_common(LWIP_TFTP_MODE_SERVER, &tftp_ctx);
   }   
 #endif
 
+
 #ifdef HAS_USBHOST
+  board_init();
   printf("Init USB...\n");
   
-  board_init();
   printf("TinyUSB Host HID Controller Example\r\n");
   printf("Note: Events only displayed for explicit supported controllers\r\n");
   // init host stack on configured roothub port
   tuh_init(BOARD_TUH_RHPORT);
+#endif
+#endif
+
+#ifndef HAS_PETIO
+#ifdef HAS_USBDEVICE
+  usb_serial_init(&serial_rx);
 #endif
 #endif
 
@@ -1792,12 +1792,14 @@ int main()
 #ifndef HAS_PETIO
         else 
         if (!strncmp(scratchpad, "keyboard=", 9)) {
+#ifdef HAS_USBHOST          
           if ( ( scratchpad[9]=='u') && (scratchpad[10]=='k') ) {
             kbd_set_locale(KLAYOUT_UK);
           }
           else if ( ( scratchpad[9]=='b') && (scratchpad[10]=='e') ) {
             kbd_set_locale(KLAYOUT_BE);
           }
+#endif 
         }
 #endif        
       }
@@ -1808,15 +1810,21 @@ int main()
 #ifndef HAS_PETIO
   printf("Init Video...\n");
 #endif
-  multicore_launch_core1(VgaCoreWithSound);  
-  VideoSetup();
+
+#ifdef ISRP2350 
+  doorbell_id = multicore_doorbell_claim_unused((1 << NUM_CORES) - 1, true);
+#endif
+  multicore_launch_core1(GfxCoreWithSound);  
+  GfxVideoSetup();
   //screen_width = 640;
   VideoRenderInit();
 
 #ifndef HAS_PETIO
   printf("Init Audio...\n");
 #endif
+#ifdef HAS_AUDIO
   Core1Exec(AudioRenderInit);
+#endif
 
 #ifdef HAS_PETIO
 #ifdef PETIO_EDIT
@@ -1829,9 +1837,16 @@ int main()
   pet_start();
 #ifdef EMU_ACCURATE
   multicore_fifo_clear_irq();
-  irq_set_exclusive_handler(SIO_IRQ_PROC0,core0_sio_irq);
+#ifdef ISRP2040 
+  irq_set_exclusive_handler(SIO_IRQ_PROC0,core0_irq);
   //irq_set_priority (SIO_IRQ_PROC0, PICO_DEFAULT_IRQ_PRIORITY);
   irq_set_enabled(SIO_IRQ_PROC0,true);  
+#endif  
+#ifdef ISRP2350 
+  uint32_t irq = multicore_doorbell_irq_num(doorbell_id);
+  irq_set_exclusive_handler(irq, core0_irq);
+  irq_set_enabled(irq, true);
+#endif    
 #endif  
   // main loop
   while (true)
@@ -1843,7 +1858,8 @@ int main()
       pet_running = true;
       SystemReset();
     }
-    WaitVSync();
+    GfxWaitVSync();
+
 #ifdef HAS_USBHOST
     // tinyusb host task
     tuh_task();
@@ -1891,13 +1907,6 @@ int main()
       }
       else 
       {
-        /*
-        if (input_delay != 0 ) 
-        {
-          input_delay--;
-        }  
-        else
-        */  
         {
           if (slowdown == 0)
           {
@@ -1927,7 +1936,9 @@ int main()
 }
 
 void Core1Call(void) {
+#ifdef HAS_AUDIO  
     pwm_audio_handle_buffer();
+#endif 
     handleCmdQueue();
 #ifdef HAS_PETIO
     if (pet_reset) {

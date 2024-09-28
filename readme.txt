@@ -1,19 +1,41 @@
 ## build procedure (PICOW only required for standalone emu mode with tftp over WIFI)
 # install PICO-SDK (or update it by pulling)
+pico-sdk 2.0 (for RP2350, pico2)
+--------------------
 git clone -b master https://github.com/raspberrypi/pico-sdk.git
 cd pico-sdk/
+cd lib
+mv tinyusb tinyusb.old
+git clone https://github.com/hathach/tinyusb.git
+cd tinyusb
+python3 tools/get_deps.py rp2040
+cd ..
 git submodule update --init
 export PICO_SDK_PATH=/Users/jean-marcharvengt/Documents/pico/pico-sdk (path to pico-sdk!)
+
+pico-sdk 1.0 (for RP2040, pico or pico-w)
+--------------------
+git clone -b master https://github.com/raspberrypi/pico-sdk.git
+cd pico-sdk/
+git checkout 1.5.0 (tag 1.5.0!!) 
+git pull
+git submodule update --init
+cd ..
+mv pico-sdk pico-sdk1
+export PICO_SDK_PATH=/Users/jean-marcharvengt/Documents/pico/pico-sdk1 (path to pico-sdk!)
+
+
 # build (you cloned this project!)
 cd hyperpetpico
 edit CMakeLists.txt and uncomment proper target
-#set(TARGET hyperpetpico)        => to use in a real PET
-#set(TARGET hyperpetpicoemu)     => to use as standalone emu without wifi
+#set(TARGET hyperpetpico)        => to use in a real PET (pico,picow and pico2)
+#set(TARGET hyperpetpicoemu)     => to use as standalone emu without wifi (pico and pico2)
 #set(TARGET hyperpetpicoemuwifi) => to use as standalone emu with wifi (picow only)
 mkdir build
 cd build
-picow: cmake -DPICO_BOARD=pico_w ..
 pico : cmake .. 
+picow: cmake -DPICO_BOARD=pico_w ..
+pico2: cmake -DPICO_PLATFORM=rp2350 -DPICO_BOARD=pico2 ..
 make
  
 ## connect over WiFi (picow standalone)
@@ -26,7 +48,7 @@ download and install acme from https://github.com/meonwax/acme
 cd prgs
 ./acme <example>.a
 
-## upload 6502 samples (standalone emulator mode only)
+## upload 6502 samples (standalone emulator mode only picow)
 connect your PC to the "hyperpetpico" access point
 tftp 192.168.123.1
 binary                       => Set transfer to binary more
@@ -35,6 +57,9 @@ put <example>.a.prg reset    => Reset the PET
 put <example>.a.prg key      => Send a KEY to PET
 q                            => Quit
 
+## upload 6502 samples (standalone emulator mode only pico2)
+connect pico2 USB micro to PC via USB (data/prog cable)
+Use vkey application in tools
 
 ## compress bitmap for PET
 resize your image to 320x200 and save as JPG

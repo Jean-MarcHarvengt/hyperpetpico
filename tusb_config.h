@@ -36,7 +36,12 @@
 
  #if CFG_TUSB_MCU == OPT_MCU_RP2040
 // change to 1 if using pico-pio-usb as host controller for raspberry rp2040
+#ifdef ISRP2040 
 #define CFG_TUH_RPI_PIO_USB   0
+#endif
+#ifdef ISRP2350 
+#define CFG_TUH_RPI_PIO_USB   1
+#endif
 #define BOARD_TUH_RHPORT      CFG_TUH_RPI_PIO_USB
 #endif
 
@@ -66,6 +71,14 @@
 #ifndef CFG_TUSB_DEBUG
 #define CFG_TUSB_DEBUG        0
 #endif
+
+// Enable Device stack
+//#define CFG_TUD_ENABLED           1
+//#define CFG_TUD_CDC               1
+// CDC FIFO size of TX and RX
+//#define CFG_TUD_CDC_RX_BUFSIZE   (TUD_OPT_HIGH_SPEED ? 512 : 64)
+//#define CFG_TUD_CDC_TX_BUFSIZE   (TUD_OPT_HIGH_SPEED ? 512 : 64)
+
 
 // Enable Host stack
 #define CFG_TUH_ENABLED       1

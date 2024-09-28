@@ -2,6 +2,7 @@
 #define PETBUS_H
 
 #include "global.h"
+#include "stdint.h"
 
 //
 // 8000-9fff: memory map GFX+SOUND expansion
