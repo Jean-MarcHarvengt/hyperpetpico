@@ -181,7 +181,7 @@ endif()
 
 target_include_directories(${TARGET} PRIVATE ${CMAKE_CURRENT_LIST_DIR} )
 
-
+#target_compile_definitions(${TARGET} PRIVATE CFG_TUSB_DEBUG=2)
 #target_compile_options(${TARGET} PUBLIC -Ofast)
 #target_compile_options(${TARGET} PUBLIC -O)
 #target_compile_options(${TARGET} PUBLIC -O2)
@@ -191,7 +191,7 @@ target_include_directories(${TARGET} PRIVATE ${CMAKE_CURRENT_LIST_DIR} )
 #	PICO_CORE1_STACK_SIZE=0x200	
 #	)
 
-#pico_enable_stdio_uart(${TARGET} TRUE)
+pico_enable_stdio_uart(${TARGET} TRUE)
 #pico_enable_stdio_usb(${TARGET} TRUE)
 
 #suppress_pico_sdk_warnings()

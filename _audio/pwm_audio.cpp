@@ -6,10 +6,8 @@
 #include "hardware/pwm.h"
 #include "pico/float.h"
 #include <string.h>
+#include <stdio.h>
 
-#ifdef AUDIO_CBACK
-#define SAMPLE_REPEAT_SHIFT 0    // not possible to repeat samples CBACK!!
-#endif
 #ifdef AUDIO_IRQ
 #define SAMPLE_REPEAT_SHIFT 2    // shift 2 is REPETITION_RATE=4
 #endif
@@ -18,6 +16,9 @@
 #endif
 #ifdef AUDIO_3DMA
 #define SAMPLE_REPEAT_SHIFT 2    // shift 2 is REPETITION_RATE=4
+#endif
+#ifndef SAMPLE_REPEAT_SHIFT
+#define SAMPLE_REPEAT_SHIFT 0    // not possible to repeat samples CBACK!!
 #endif
 
 #define REPETITION_RATE     (1<<SAMPLE_REPEAT_SHIFT) 
@@ -41,22 +42,6 @@ static int pwm_dma_chan;
 /********************************
  * Processing
 ********************************/ 
-// process a single sample (from audio interrupt or timer or ..)
-// should be called at SOUNDRATE
-#ifdef AUDIO_CBACK
-void pwm_audio_handle_sample(void)
-{
-  pwm_set_gpio_level(AUDIO_PIN, snd_buffer[snd_sample_ptr >> SAMPLE_REPEAT_SHIFT]);
-  if (snd_sample_ptr < (snd_nb_samples << SAMPLE_REPEAT_SHIFT) - 1) {
-      ++snd_sample_ptr;
-  } else {
-      cur_audio_buffer = 1 - cur_audio_buffer;
-      snd_buffer = audio_buffers[cur_audio_buffer];
-      snd_sample_ptr = 0;
-  }   
-}
-#endif
-
 #ifdef AUDIO_IRQ
 static void __isr __time_critical_func(AUDIO_isr)()
 {
@@ -99,7 +84,7 @@ void pwm_audio_handle_buffer(void)
   }
   audio_sample *buf = audio_buffers[last_audio_buffer];
   last_audio_buffer = cur_audio_buffer;
-  fillsamples(buf, snd_nb_samples);
+  if (fillsamples != NULL) fillsamples(buf, snd_nb_samples);
 }
 
 void pwm_audio_reset(void)
@@ -118,7 +103,7 @@ void pwm_audio_init(int buffersize, void (*callback)(audio_sample * stream, int 
   snd_sample_ptr = 0;
   snd_buffer =  (audio_sample*)malloc(snd_nb_samples*sizeof(audio_sample));
   if (snd_buffer == NULL) {
-    //printf("sound buffer could not be allocated!!!!!\n");
+    printf("sound buffer could not be allocated!!!!!\n");
     return;  
   }
   memset((void*)snd_buffer,128, snd_nb_samples*sizeof(audio_sample));

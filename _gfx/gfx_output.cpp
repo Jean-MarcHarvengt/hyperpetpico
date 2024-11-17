@@ -62,6 +62,18 @@ bool GfxIsVSync(void)
 #endif   
 }
 
+/*
+int GfxVCount(void)
+{
+#ifdef ISRP2350
+  return HdmiVCount(); 
+#endif
+#ifdef ISRP2040
+  return 0;
+#endif
+}
+*/
+
 void GfxVideoInit(uint8_t mode, bool firstTime)
 {
 #ifdef ISRP2040   

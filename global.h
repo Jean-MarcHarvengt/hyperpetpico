@@ -6,7 +6,7 @@
 // defined in CMakeList.txt by target
 //#define HAS_PETIO       1  	// PET extension (or standalone emu)
 //#define HAS_NETWORK     1     // enable network wifi (standalone mode emu only)  
-#define HAS_USBHOST     1     // enable USB keyboard
+//#define HAS_USBHOST     1     // enable USB keyboard
 #ifdef ISRP2350 
 #define HAS_USBDEVICE   1     // enable USB serial
 #endif
@@ -18,15 +18,18 @@
 #define SIXTYHZ         1     // 60Hz mode
 #define WIFI_AP         1     // WIFI as access point (preferred!)
 
-#ifdef ISRP2040 
 #define HAS_AUDIO     1       // enable audio
-#endif
 
-#define AUDIO_8BIT      1     // audio samples are 8bits
-//#define AUDIO_CBACK     1     // handle audio samples from VGA line callback
+#ifdef ISRP2040 
+//#define AUDIO_8BIT      1     // audio samples are 8bits
 //#define AUDIO_IRQ       1     // handle audio samples from IRQ
 //#define AUDIO_1DMA      1     // handle audio samples with 1 DMA
 #define AUDIO_3DMA      1     // handle audio samples with 3 DMA
+#endif
+
+#ifdef ISRP2350 
+#define AUDIO_8BIT      1     // audio samples are 8bits
+#endif
 
 #ifdef AUDIO_1DMA
 #undef AUDIO_8BIT

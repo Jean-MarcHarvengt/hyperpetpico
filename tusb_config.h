@@ -30,17 +30,49 @@
  extern "C" {
 #endif
 
-//--------------------------------------------------------------------+
-// Board Specific Configuration
-//--------------------------------------------------------------------+
+//--------------------------------------------------------------------
+// Common Configuration
+//--------------------------------------------------------------------
+//#ifndef TUD_OPT_HIGH_SPEED
+//#define TUD_OPT_HIGH_SPEED    1
+//#endif
+#define BOARD_DEVICE_RHPORT_SPEED   OPT_MODE_HIGH_SPEED
 
- #if CFG_TUSB_MCU == OPT_MCU_RP2040
-// change to 1 if using pico-pio-usb as host controller for raspberry rp2040
-#ifdef ISRP2040 
-#define CFG_TUH_RPI_PIO_USB   0
+// defined by compiler flags for flexibility
+#ifndef CFG_TUSB_MCU
+#error CFG_TUSB_MCU must be defined
 #endif
+
+#ifndef CFG_TUSB_OS
+#define CFG_TUSB_OS           OPT_OS_NONE
+#endif
+
+/* USB DMA on some MCUs can only access a specific SRAM region with restriction on alignment.
+ * Tinyusb use follows macros to declare transferring memory so that they can be put
+ * into those specific section.
+ * e.g
+ * - CFG_TUSB_MEM SECTION : __attribute__ (( section(".usb_ram") ))
+ * - CFG_TUSB_MEM_ALIGN   : __attribute__ ((aligned(4)))
+ */
+#ifndef CFG_TUH_MEM_SECTION
+#define CFG_TUH_MEM_SECTION
+#endif
+
+#ifndef CFG_TUH_MEM_ALIGN
+#define CFG_TUH_MEM_ALIGN     __attribute__ ((aligned(4)))
+#endif
+
+//--------------------------------------------------------------------
+// Host Configuration
+//--------------------------------------------------------------------
+#if CFG_TUSB_MCU == OPT_MCU_RP2040
+// change to 0 if using on-board native micro USB
+// change to 1 if using pico-pio-usb as host controller for raspberry rp2040
 #ifdef ISRP2350 
 #define CFG_TUH_RPI_PIO_USB   1
+#endif
+#ifdef ISRP2040 
+#define CFG_TUH_RPI_PIO_USB   0
 #endif
 #define BOARD_TUH_RHPORT      CFG_TUH_RPI_PIO_USB
 #endif
@@ -55,29 +87,6 @@
 #define BOARD_TUH_MAX_SPEED   OPT_MODE_DEFAULT_SPEED
 #endif
 
-//--------------------------------------------------------------------
-// COMMON CONFIGURATION
-//--------------------------------------------------------------------
-
-// defined by compiler flags for flexibility
-#ifndef CFG_TUSB_MCU
-#error CFG_TUSB_MCU must be defined
-#endif
-
-#ifndef CFG_TUSB_OS
-#define CFG_TUSB_OS           OPT_OS_NONE
-#endif
-
-#ifndef CFG_TUSB_DEBUG
-#define CFG_TUSB_DEBUG        0
-#endif
-
-// Enable Device stack
-//#define CFG_TUD_ENABLED           1
-//#define CFG_TUD_CDC               1
-// CDC FIFO size of TX and RX
-//#define CFG_TUD_CDC_RX_BUFSIZE   (TUD_OPT_HIGH_SPEED ? 512 : 64)
-//#define CFG_TUD_CDC_TX_BUFSIZE   (TUD_OPT_HIGH_SPEED ? 512 : 64)
 
 
 // Enable Host stack

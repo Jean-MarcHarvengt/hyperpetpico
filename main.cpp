@@ -9,7 +9,14 @@
 
 #include "gfx_output.h"
 
+#ifdef HAS_AUDIO
+#ifdef ISRP2350
+#include "hdmi.h"
+#endif
+#ifdef ISRP2040 
 #include "pwm_audio.h"
+#endif
+#endif
 #include "petbus.h"
 #ifndef HAS_PETIO
 #include "mos6502.h"
@@ -134,6 +141,9 @@ static ALIGNED u8 TileData[TILE_MAXDATA+GFX_MARGIN];
 // Font definition (dual upper and lower case)
 static unsigned char font[FONT_SIZE];
 
+// vsync
+volatile int vcount;
+
 // Reset
 static bool pet_reset = false;
 
@@ -184,17 +194,20 @@ void __not_in_flash("LineCall") LineCall(void)
   {
     pet_reset = true;
   }
-#endif  
-#ifdef AUDIO_CBACK
-  pwm_audio_handle_sample();
 #endif
 }
 
+#ifdef HAS_AUDIO
+#ifdef ISRP2040 
 static void audio_fill_buffer( audio_sample * stream, int len )
+#endif
+#ifdef ISRP2350
+static void audio_fill_buffer( audio_sample * stream, int len )
+#endif
 {
   playSID.update(SOUNDRATE, (void *)stream, len);
 }
-
+#endif
 
 static void sid_dump( void )
 {
@@ -223,6 +236,7 @@ static void ResetGFXMem(void)
 
 void __not_in_flash("VideoRenderUpdate") VideoRenderUpdate(void)
 {
+    vcount++;
     mem[REG_VSYNC] = MAXHEIGHT;
     int vmode = GET_VIDEO_MODE;
     if (video_mode != vmode) {
@@ -356,10 +370,7 @@ void __not_in_flash("VideoRenderUpdate") VideoRenderUpdate(void)
       }   
       mem[REG_SPRITE_COL_HI+i] = colbits;
       */       
-    }
-#ifdef HAS_AUDIO
-    sid_dump();
-#endif    
+    }   
 #ifndef HAS_PETIO
 #ifdef EMU_ACCURATE
 #ifdef ISRP2040 
@@ -638,14 +649,23 @@ static void AudioRenderInit(void)
 {
   //31500/60=525,31500/50=630 samples per frame
   //22050/60=367,22050/50=441 samples per frame
+#ifdef ISRP2040 
   pwm_audio_init(2048, audio_fill_buffer);
   playSID.begin(SOUNDRATE, 1024); 
+#endif
+#ifdef ISRP2350 
+  HdmiInitAudio(1024, audio_fill_buffer);
+  playSID.begin(SOUNDRATE, 512); 
+#endif
+  printf("AudioRenderInit\n");
 }
 
 static void SystemReset(void)
 {  
   VideoRenderInit();
+#ifdef ISRP2040 
   pwm_audio_reset();
+#endif
   joystick0 = 0xff;
   kbdasjoy = false;
 }
@@ -1733,6 +1753,11 @@ static const struct tftp_context tftp_ctx = {
 int main()
 {
   stdio_init_all();
+#ifdef HAS_USBHOST
+#ifdef ISRP2350 
+  printf("USB D+/D- on GP%d and GP%d\r\n", PIO_USB_DP_PIN_DEFAULT, PIO_USB_DP_PIN_DEFAULT+1);
+#endif
+#endif
 
   // PAL mode (only relevant if PETIO_EDIT enabled)
   mem[REG_PALNTSC] = 0;
@@ -1935,9 +1960,21 @@ int main()
 #endif
 }
 
+static int oldv=-1;
+
 void Core1Call(void) {
-#ifdef HAS_AUDIO  
-    pwm_audio_handle_buffer();
+#ifdef HAS_AUDIO
+    int v = vcount;
+    if (v != oldv)
+#ifdef ISRP2040 
+      sid_dump();
+      pwm_audio_handle_buffer();
+#endif    
+#ifdef ISRP2350 
+      sid_dump();
+      HdmiHandleAudio();
+#endif    
+    oldv = v;
 #endif 
     handleCmdQueue();
 #ifdef HAS_PETIO

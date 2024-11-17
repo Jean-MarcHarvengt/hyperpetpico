@@ -11,7 +11,10 @@
 #include "hardware/structs/hstx_fifo.h"
 #include "hardware/clocks.h"
 #include "hardware/vreg.h"
+#include "hardware/pwm.h"
 
+#include <string.h>
+#include <cstdlib>
 // ----------------------------------------------------------------------------
 // DVI constants
 
@@ -119,6 +122,7 @@ static bool vactive_cmdlist_posted = false;
 static int hdmi_mode;
 
 volatile Bool VSync;    // current scan line is vsync or dark
+//volatile int VCount;    // current vsync count
 
 // line buffers
 static ALIGNED u8 LineBuf1[640];
@@ -162,6 +166,15 @@ extern void VideoRenderUpdate(void);
 extern void LineCall(void);
 extern void Core1Call(void);
 
+#ifdef HAS_AUDIO
+static audio_sample * snd_buffer = NULL; // samples buffer
+static uint16_t snd_nb_samples;      // total nb samples (mono) later divided by 2
+static uint16_t snd_sample_ptr = 0;  // sample index
+static int last_audio_buffer = 0;
+static int cur_audio_buffer = 0;
+static void (*fillsamples)(audio_sample * stream, int len) = nullptr;
+#endif
+
 void __scratch_x("") dma_irq_handler() {
     // dma_pong indicates the channel that just finished, which is the one
     // we're about to reload.
@@ -170,7 +183,6 @@ void __scratch_x("") dma_irq_handler() {
     dma_hw->intr = 1u << ch_num;
     dma_pong = !dma_pong;
 
-    LineCall();
 #define DMACTRLREG al3_ctrl //ctrl_trig
 
     if (v_scanline >= MODE_V_FRONT_PORCH && v_scanline < (MODE_V_FRONT_PORCH + MODE_V_SYNC_WIDTH)) {
@@ -178,22 +190,36 @@ void __scratch_x("") dma_irq_handler() {
         ch->transfer_count = count_of(vblank_line_vsync_on);
         ch->DMACTRLREG = dma_ctrl_32[dma_pong];
         VSync = True;
-        if (v_scanline == MODE_V_FRONT_PORCH) VideoRenderUpdate();
+#ifdef HAS_AUDIO
+        pwm_set_gpio_level(AUDIO_PIN, snd_buffer[snd_sample_ptr++]);
+#endif
+        if (v_scanline & 1) LineCall();
+        if (v_scanline == MODE_V_FRONT_PORCH) {
+          VideoRenderUpdate();
+          //VCount++;
+        }  
     } else if (v_scanline < MODE_V_FRONT_PORCH + MODE_V_SYNC_WIDTH + MODE_V_BACK_PORCH) {
         ch->read_addr = (uintptr_t)vblank_line_vsync_off;
         ch->transfer_count = count_of(vblank_line_vsync_off);
         ch->DMACTRLREG = dma_ctrl_32[dma_pong];
         VSync = False;
+#ifdef HAS_AUDIO
+        pwm_set_gpio_level(AUDIO_PIN, snd_buffer[snd_sample_ptr++]);
+#endif
+        if (v_scanline & 1) LineCall();
     } else if (!vactive_cmdlist_posted) {
         ch->read_addr = (uintptr_t)vactive_line;
         ch->transfer_count = count_of(vactive_line);
         ch->DMACTRLREG = dma_ctrl_32[dma_pong];
         vactive_cmdlist_posted = true;
+#ifdef HAS_AUDIO
+        pwm_set_gpio_level(AUDIO_PIN, snd_buffer[snd_sample_ptr++]);
+#endif
+        if (v_scanline & 1) LineCall();
     } else {
         int y0 = (v_scanline - (MODE_V_TOTAL_LINES - MODE_V_ACTIVE_LINES));
         vactive_cmdlist_posted = false;
-        if ( (y0>=40) && (y0<440) ) {
-          y0 -= 40;
+        if ( (y0>=40) && (y0<442) ) {
           ch->read_addr = (uintptr_t)rend_dbuf;
           ch->transfer_count = dma_count;
           ch->DMACTRLREG = (hdmi_mode?dma_ctrl_lo[dma_pong]:dma_ctrl_hi[dma_pong]) ;
@@ -207,6 +233,7 @@ void __scratch_x("") dma_irq_handler() {
           {
             dbuf = LineBuf2;
           }
+          y0 -= 40;
           u8 BufMod = y0 & 1;
           if (BufMod)
             BufInx = BufInx ^ 1;
@@ -244,7 +271,7 @@ void __scratch_x("") dma_irq_handler() {
             else { 
               VideoRenderLineL1(dbuf, y0);
             }
-            rend_dbuf = dbuf;
+            rend_dbuf = (y0 >= 200)?LineBlack:dbuf;
           }
         }
         else {
@@ -258,7 +285,25 @@ void __scratch_x("") dma_irq_handler() {
     if (!vactive_cmdlist_posted) {
         v_scanline = (v_scanline + 1) % MODE_V_TOTAL_LINES;
     }
+#ifdef HAS_AUDIO
+    if (snd_sample_ptr >= snd_nb_samples) {
+        snd_sample_ptr = 0;
+    }
+    cur_audio_buffer = (snd_sample_ptr >= (snd_nb_samples/2))?0:1;
+#endif    
 }
+
+#ifdef HAS_AUDIO
+void  HdmiHandleAudio(void)
+{
+    if (last_audio_buffer == cur_audio_buffer)
+        return;
+
+    audio_sample *buf = &snd_buffer[cur_audio_buffer*(snd_nb_samples/2)];
+    if (fillsamples != NULL) fillsamples((audio_sample*)buf, snd_nb_samples/2);
+    last_audio_buffer = cur_audio_buffer;
+}
+#endif
 
 
 void (* volatile Core1Fnc)() = NULL; // core 1 remote function
@@ -268,6 +313,7 @@ void HdmiCore(void)
 //  set_sys_clock_khz(125000, true);    
 //  vreg_set_voltage(VREG_VOLTAGE_1_05);
   set_sys_clock_khz(250000, true);
+//  set_sys_clock_khz(240000, true);
   //CLK_HSTX_DIV = 2 << 16; // HSTX clock/2
   *((uint32_t *)(0x40010000+0x58)) = 2 << 16;
 
@@ -400,13 +446,25 @@ void HdmiCore(void)
     LineBlack[i]=0x00;
   }
 
+#ifdef HAS_AUDIO
+  gpio_set_function(AUDIO_PIN, GPIO_FUNC_PWM);
+
+  int audio_pin_slice = pwm_gpio_to_slice_num(AUDIO_PIN);
+  pwm_set_gpio_level(AUDIO_PIN, 0);
+
+  // Setup PWM for audio output
+  pwm_config config = pwm_get_default_config();
+  pwm_config_set_clkdiv(&config, (((float)SOUNDRATE)/1000));
+  pwm_config_set_wrap(&config, 254);
+  pwm_init(audio_pin_slice, &config, true);
+#endif
+
   dma_channel_start(DMACH_PING);
 
   void (*fnc)();
   while (1)
   {
     __dmb();
-
     // execute remote function
     fnc = Core1Fnc;
     if (fnc != NULL)
@@ -433,11 +491,33 @@ bool HdmiIsVSync(void)
   return VSync;
 }
 
+/*
+int HdmiVCount(void)
+{
+  return VCount;
+}
+*/
+
 void HdmiInit(int mode)
 {
   hdmi_mode = mode;
 }
 
+void HdmiInitAudio(int samplesize, void (*callback)(audio_sample * stream, int len))
+{
+#ifdef HAS_AUDIO
+  if ( snd_buffer == NULL) {
+      snd_buffer =  (audio_sample*)malloc(samplesize*sizeof(audio_sample));
+      if (snd_buffer == NULL) {
+        return;  
+      }  
+      fillsamples = callback;    
+      snd_nb_samples = samplesize;
+      snd_sample_ptr = 0;
+      memset((void*)snd_buffer,0, snd_nb_samples*sizeof(audio_sample));   
+  }  
+#endif
+}
 
 // execute core 1 remote function
 void Core1Exec(void (*fnc)())

@@ -15,14 +15,9 @@ export PICO_SDK_PATH=/Users/jean-marcharvengt/Documents/pico/pico-sdk (path to p
 
 pico-sdk 1.0 (for RP2040, pico or pico-w)
 --------------------
-git clone -b master https://github.com/raspberrypi/pico-sdk.git
-cd pico-sdk/
-git checkout 1.5.0 (tag 1.5.0!!) 
-git pull
-git submodule update --init
-cd ..
-mv pico-sdk pico-sdk1
-export PICO_SDK_PATH=/Users/jean-marcharvengt/Documents/pico/pico-sdk1 (path to pico-sdk!)
+Download pico-sdk-1.5.1.tar.gz from https://github.com/raspberrypi/pico-sdk/releases
+tar xfvz pico-sdk-1.5.1.tar.gz
+export PICO_SDK_PATH=/Users/jean-marcharvengt/Documents/pico/pico-sdk-1.5.1 (path to pico-sdk!)
 
 
 # build (you cloned this project!)

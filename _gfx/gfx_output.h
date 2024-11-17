@@ -12,5 +12,6 @@ extern void GfxVideoSetup(void);
 extern void GfxVideoInit(uint8_t mode, bool firstTime);
 extern void GfxWaitVSync(void);
 extern bool GfxIsVSync(void);
+//extern int GfxVCount(void);
 
 #endif
