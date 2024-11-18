@@ -2,6 +2,7 @@
 #define HDMI_H
 
 #include "stdint.h"
+#include "global.h"
 
 
 #ifdef HAS_AUDIO
@@ -24,5 +25,6 @@ extern bool HdmiIsVSync(void);
 #ifdef HAS_AUDIO
 extern void HdmiInitAudio(int samplesize, void (*callback)(audio_sample * stream, int len));
 extern void HdmiHandleAudio(void);
+extern void HdmiResetAudio(void);
 #endif
 #endif

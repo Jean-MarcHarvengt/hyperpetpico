@@ -1,8 +1,12 @@
 #ifndef PWM_AUDIO_H
 #define PWM_AUDIO_H
 
+
 #include "stdint.h"
 #include "global.h"
+
+#ifdef HAS_AUDIO
+#ifndef AUDIO_CB
 
 #ifdef AUDIO_8BIT
 typedef uint8_t  audio_sample;
@@ -19,5 +23,8 @@ typedef uint16_t  audio_sample;
 extern void pwm_audio_init(int buffersize, void (*callback)(audio_sample * stream, int len));
 extern void pwm_audio_handle_buffer(void);
 extern void pwm_audio_reset(void);
+
+#endif
+#endif
 
 #endif

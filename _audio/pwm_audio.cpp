@@ -1,5 +1,8 @@
 #include "pwm_audio.h"
 
+#ifdef HAS_AUDIO
+#ifndef AUDIO_CB
+
 #include "hardware/dma.h"
 #include "hardware/gpio.h"
 #include "hardware/irq.h"
@@ -221,6 +224,7 @@ void pwm_audio_init(int buffersize, void (*callback)(audio_sample * stream, int 
   dma_channel_start(pwm_dma_chan);
 #endif
 }
-
+#endif
+#endif
 
 

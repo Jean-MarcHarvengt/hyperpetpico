@@ -8,6 +8,23 @@
 #ifndef _VGA_H
 #define _VGA_H
 
+#include "global.h"
+
+
+#ifdef HAS_AUDIO
+#ifdef AUDIO_CB
+
+#ifdef AUDIO_8BIT
+typedef uint8_t  audio_sample;
+#else
+typedef uint16_t  audio_sample;
+#endif
+
+#define SOUNDRATE 31500			// sound rate = VGALINE [Hz] 525x60
+
+#endif
+#endif
+
 // fill memory buffer with u32 words
 //  buf ... data buffer, must be 32-bit aligned
 //  data ... data word to store
@@ -104,4 +121,11 @@ void WaitScanline(int scanline);
 // get scanline
 int GetScanline();
 
+#ifdef HAS_AUDIO
+#ifdef AUDIO_CB
+extern void VgaInitAudio(int samplesize, void (*callback)(audio_sample * stream, int len));
+extern void VgaHandleAudio(void);
+extern void VgaResetAudio(void);
+#endif
+#endif
 #endif // _VGA_H

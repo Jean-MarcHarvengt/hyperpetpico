@@ -303,6 +303,11 @@ void  HdmiHandleAudio(void)
     if (fillsamples != NULL) fillsamples((audio_sample*)buf, snd_nb_samples/2);
     last_audio_buffer = cur_audio_buffer;
 }
+
+void HdmiResetAudio(void) 
+{
+  memset((void*)snd_buffer,0, snd_nb_samples*sizeof(audio_sample));
+}
 #endif
 
 
@@ -503,9 +508,9 @@ void HdmiInit(int mode)
   hdmi_mode = mode;
 }
 
+#ifdef HAS_AUDIO
 void HdmiInitAudio(int samplesize, void (*callback)(audio_sample * stream, int len))
 {
-#ifdef HAS_AUDIO
   if ( snd_buffer == NULL) {
       snd_buffer =  (audio_sample*)malloc(samplesize*sizeof(audio_sample));
       if (snd_buffer == NULL) {
@@ -516,8 +521,8 @@ void HdmiInitAudio(int samplesize, void (*callback)(audio_sample * stream, int l
       snd_sample_ptr = 0;
       memset((void*)snd_buffer,0, snd_nb_samples*sizeof(audio_sample));   
   }  
-#endif
 }
+#endif
 
 // execute core 1 remote function
 void Core1Exec(void (*fnc)())

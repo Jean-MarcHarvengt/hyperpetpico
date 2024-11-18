@@ -14,7 +14,11 @@
 #include "hdmi.h"
 #endif
 #ifdef ISRP2040 
+#ifdef AUDIO_CB
+#include "vga.h"
+#else
 #include "pwm_audio.h"
+#endif
 #endif
 #endif
 #include "petbus.h"
@@ -28,8 +32,8 @@
 #include "lwip/apps/tftp_server.h"
 #include "network.h"
 #endif
-#include "bsp/board.h"
 #ifdef HAS_USBHOST
+#include "bsp/board_api.h"
 #include "tusb.h"
 #include "kbd.h"
 extern "C" void cdc_task(void);
@@ -198,12 +202,7 @@ void __not_in_flash("LineCall") LineCall(void)
 }
 
 #ifdef HAS_AUDIO
-#ifdef ISRP2040 
 static void audio_fill_buffer( audio_sample * stream, int len )
-#endif
-#ifdef ISRP2350
-static void audio_fill_buffer( audio_sample * stream, int len )
-#endif
 {
   playSID.update(SOUNDRATE, (void *)stream, len);
 }
@@ -649,9 +648,14 @@ static void AudioRenderInit(void)
 {
   //31500/60=525,31500/50=630 samples per frame
   //22050/60=367,22050/50=441 samples per frame
-#ifdef ISRP2040 
+#ifdef ISRP2040
+#ifdef AUDIO_CB
+  VgaInitAudio(1024, audio_fill_buffer);
+  playSID.begin(SOUNDRATE, 512); 
+#else 
   pwm_audio_init(2048, audio_fill_buffer);
   playSID.begin(SOUNDRATE, 1024); 
+#endif
 #endif
 #ifdef ISRP2350 
   HdmiInitAudio(1024, audio_fill_buffer);
@@ -663,9 +667,17 @@ static void AudioRenderInit(void)
 static void SystemReset(void)
 {  
   VideoRenderInit();
-#ifdef ISRP2040 
+#ifdef ISRP2040
+#ifndef AUDIO_CB 
   pwm_audio_reset();
+#else
+  VgaResetAudio();
 #endif
+#endif
+#ifdef ISRP2350
+  HdmiResetAudio();
+#endif
+
   joystick0 = 0xff;
   kbdasjoy = false;
 }
@@ -1888,9 +1900,6 @@ int main()
 #ifdef HAS_USBHOST
     // tinyusb host task
     tuh_task();
-#if CFG_TUH_CDC
-    cdc_task();
-#endif
 #if CFG_TUH_HID
     hid_app_task();
 #endif
@@ -1964,27 +1973,31 @@ static int oldv=-1;
 
 void Core1Call(void) {
 #ifdef HAS_AUDIO
-    int v = vcount;
-    if (v != oldv)
+  int v = vcount;
+  if (v != oldv) {
+    sid_dump();  
+    oldv = v;
+  }
 #ifdef ISRP2040 
-      sid_dump();
-      pwm_audio_handle_buffer();
+#ifdef AUDIO_CB    
+  VgaHandleAudio();
+#else
+  pwm_audio_handle_buffer();
+#endif    
 #endif    
 #ifdef ISRP2350 
-      sid_dump();
-      HdmiHandleAudio();
+  HdmiHandleAudio();
 #endif    
-    oldv = v;
 #endif 
-    handleCmdQueue();
+  handleCmdQueue();
 #ifdef HAS_PETIO
-    if (pet_reset) {
-      pet_reset = false;
+  if (pet_reset) {
+    pet_reset = false;
 #ifdef PETIO_EDIT
-      InstallEditRom();
+    InstallEditRom();
 #endif 
-      SystemReset();
-    }     
+    SystemReset();
+  }     
 #endif
 } 
 

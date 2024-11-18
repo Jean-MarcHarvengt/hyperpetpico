@@ -7,6 +7,12 @@
 
 #include "include.h"
 
+#ifdef HAS_AUDIO
+#ifdef AUDIO_CB
+#include "hardware/pwm.h"
+#endif
+#endif
+
 // scanline type
 #define LINE_VSYNC	0	// long vertical sync
 #define LINE_DARK	1	// dark line
@@ -70,6 +76,17 @@ extern void VideoRenderUpdate(void);
 extern void LineCall(void);
 extern void Core1Call(void);
 
+#ifdef HAS_AUDIO
+#ifdef AUDIO_CB
+static audio_sample * snd_buffer = NULL; // samples buffer
+static uint16_t snd_nb_samples;      // total nb samples (mono) later divided by 2
+static uint16_t snd_sample_ptr = 0;  // sample index
+static int last_audio_buffer = 0;
+static int cur_audio_buffer = 0;
+static void (*fillsamples)(audio_sample * stream, int len) = nullptr;
+#endif
+#endif
+
 // VGA DMA handler - called on end of every scanline
 extern "C" void __not_in_flash_func(VgaLine)()
 {
@@ -80,6 +97,12 @@ extern "C" void __not_in_flash_func(VgaLine)()
 
 	// update DMA control channels of base layer, and run it
 	dma_channel_set_read_addr(VGA_DMA_CB0, CtrlBufNext, true);
+
+#ifdef HAS_AUDIO
+#ifdef AUDIO_CB
+        pwm_set_gpio_level(AUDIO_PIN, snd_buffer[snd_sample_ptr++]);
+#endif
+#endif
 
 	// save integer divider state
 	hw_divider_save_state(&DividerState);
@@ -182,6 +205,15 @@ extern "C" void __not_in_flash_func(VgaLine)()
 		*cbuf++ = 0; // end mark
 		break;
 	}
+
+#ifdef HAS_AUDIO
+#ifdef AUDIO_CB
+    if (snd_sample_ptr >= snd_nb_samples) {
+        snd_sample_ptr = 0;
+    }
+    cur_audio_buffer = (snd_sample_ptr >= (snd_nb_samples/2))?0:1;
+#endif
+#endif
 
 	// restore integer divider state
 	hw_divider_restore_state(&DividerState);
@@ -480,6 +512,26 @@ void VgaInit(const sVmode* vmode)
 	pio_enable_sm_mask_in_sync(VGA_PIO, VGA_SMALL);
 }
 
+
+#ifdef HAS_AUDIO
+#ifdef AUDIO_CB
+void  VgaHandleAudio(void)
+{
+    if (last_audio_buffer == cur_audio_buffer)
+        return;
+
+    audio_sample *buf = &snd_buffer[cur_audio_buffer*(snd_nb_samples/2)];
+    if (fillsamples != NULL) fillsamples((audio_sample*)buf, snd_nb_samples/2);
+    last_audio_buffer = cur_audio_buffer;
+}
+
+void VgaResetAudio(void) 
+{
+  memset((void*)snd_buffer,0, snd_nb_samples*sizeof(audio_sample));
+}
+#endif
+#endif
+
 const sVmode* volatile VgaVmodeReq = NULL; // request to reinitialize videomode, 1=only stop driver
 
 void (* volatile Core1Fnc)() = NULL; // core 1 remote function
@@ -489,6 +541,22 @@ void VgaCore()
 {
 	const sVmode* v;
 	void (*fnc)();
+
+#ifdef HAS_AUDIO
+#ifdef AUDIO_CB
+	gpio_set_function(AUDIO_PIN, GPIO_FUNC_PWM);
+
+	int audio_pin_slice = pwm_gpio_to_slice_num(AUDIO_PIN);
+	pwm_set_gpio_level(AUDIO_PIN, 0);
+
+	// Setup PWM for audio output
+	pwm_config config = pwm_get_default_config();
+	pwm_config_set_clkdiv(&config, (((float)SOUNDRATE)/1000));
+	pwm_config_set_wrap(&config, 254);
+	pwm_init(audio_pin_slice, &config, true);
+#endif
+#endif
+
 	while (1)
 	{
 		__dmb();
@@ -566,4 +634,22 @@ int GetScanline()
 {
 	return ScanLine;
 }
+
+#ifdef HAS_AUDIO
+#ifdef AUDIO_CB
+void VgaInitAudio(int samplesize, void (*callback)(audio_sample * stream, int len))
+{
+  if ( snd_buffer == NULL) {
+      snd_buffer =  (audio_sample*)malloc(samplesize*sizeof(audio_sample));
+      if (snd_buffer == NULL) {
+        return;  
+      }  
+      fillsamples = callback;    
+      snd_nb_samples = samplesize;
+      snd_sample_ptr = 0;
+      memset((void*)snd_buffer,0, snd_nb_samples*sizeof(audio_sample));   
+  }  
+}
+#endif
+#endif
 
